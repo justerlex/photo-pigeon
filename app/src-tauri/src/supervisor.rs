@@ -700,30 +700,40 @@ impl Supervisor {
             }
         ));
 
-        if !self.shell_state.autostart_decided() {
-            if self.autostart.may_default_on() {
-                match self.autostart.enable() {
-                    Ok(()) => {
-                        self.log
-                            .line("start with Windows was turned on by default, first run");
-                        // Only a run that could really decide gets to record
-                        // that the question is settled. A development build
-                        // must not answer it on the installed copy's behalf,
-                        // and the two share this file's directory.
-                        self.shell_state.note_autostart_decided();
-                    }
-                    Err(why) => self
-                        .log
-                        .line(&format!("could not turn start with Windows on: {why}")),
+        match autostart_plan(
+            self.shell_state.autostart_decided(),
+            self.shell_state.autostart_off_chosen(),
+            autostart::recorded_value(self.autostart.name()).is_some(),
+            self.autostart.may_default_on(),
+        ) {
+            AutostartPlan::DefaultOn => match self.autostart.enable() {
+                Ok(()) => {
+                    self.log
+                        .line("start with Windows was turned on by default, first run");
+                    // Only a run that could really decide gets to record that
+                    // the question is settled. A development build must not
+                    // answer it on the installed copy's behalf, and the two
+                    // share this file's directory.
+                    self.shell_state.note_autostart_decided();
                 }
-            } else {
-                self.log.line(
-                    "not turning start with Windows on by default: this build does not own \
-                     the shipped Run value",
-                );
-            }
-        } else {
-            match self.autostart.reassert() {
+                Err(why) => self
+                    .log
+                    .line(&format!("could not turn start with Windows on: {why}")),
+            },
+            AutostartPlan::NoDefault => self.log.line(
+                "not turning start with Windows on by default: this build does not own \
+                 the shipped Run value",
+            ),
+            AutostartPlan::ReArm => match self.autostart.enable() {
+                Ok(()) => self.log.line(
+                    "the Run value was gone and nobody had turned start with Windows off, \
+                     so it has been written again",
+                ),
+                Err(why) => self.log.line(&format!(
+                    "the Run value was gone and could not be written again: {why}"
+                )),
+            },
+            AutostartPlan::Reassert => match self.autostart.reassert() {
                 Reassert::Off => self.log.line("start with Windows is off"),
                 Reassert::Correct => self
                     .log
@@ -734,7 +744,7 @@ impl Supervisor {
                 Reassert::Failed(why) => self
                     .log
                     .line(&format!("start with Windows has a stale path and {why}")),
-            }
+            },
         }
 
         self.read_autostart();
@@ -2008,6 +2018,45 @@ enum RestartPlan {
     StopFirst,
 }
 
+/// What one launch does about the Run value, from the four facts that decide it.
+///
+/// Pure for the same reason [`RestartPlan`] is pure: reaching the real thing
+/// needs an `AppHandle`, and a decision that cannot be tested is a decision that
+/// ships whatever it happens to do. The case that made this one worth pulling
+/// out is uninstall then reinstall, where every fact is ordinary and the answer
+/// used to be silently wrong.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+enum AutostartPlan {
+    /// Nobody has been asked yet and this build owns the shipped value. Apply
+    /// the default.
+    DefaultOn,
+    /// Nobody has been asked yet and the name belongs to a build tree. Nothing
+    /// is written without a click.
+    NoDefault,
+    /// The recorded choice is on and there is no value. Something outside the
+    /// app took it, so it goes back.
+    ReArm,
+    /// Keep whatever is really in the key true, and leave an off switch off.
+    Reassert,
+}
+
+fn autostart_plan(
+    decided: bool,
+    off_chosen: bool,
+    value_present: bool,
+    may_default_on: bool,
+) -> AutostartPlan {
+    let _ = (off_chosen, value_present);
+    if !decided {
+        return if may_default_on {
+            AutostartPlan::DefaultOn
+        } else {
+            AutostartPlan::NoDefault
+        };
+    }
+    AutostartPlan::Reassert
+}
+
 fn restart_plan(status: CoreStatus, has_child: bool) -> RestartPlan {
     match status {
         CoreStatus::Stopping(StopIntent::Quit | StopIntent::Detach) | CoreStatus::Quitting => {
@@ -2662,6 +2711,151 @@ mod tests {
         // Read off the disk and not off the exit code: a wizard cancelled halfway
         // exits cleanly on `stop` and leaves no config behind.
         assert_eq!(setup_ended_plan(false), None);
+    }
+
+    /// The reinstall failure the sandbox rig caught on 30 July 2026.
+    ///
+    /// Install, uninstall, reinstall, and the relaunched shell left nothing
+    /// under HKCU Run at all. Every fact here is ordinary: the uninstaller
+    /// deletes the Run value by design and spares the shell's state file by
+    /// design, so the launch after the reinstall reads the question as settled,
+    /// finds no value, and used to call that absence an off click.
+    #[test]
+    fn a_run_value_that_is_gone_with_no_off_click_behind_it_is_written_again() {
+        assert_eq!(
+            autostart_plan(true, false, false, true),
+            AutostartPlan::ReArm
+        );
+    }
+
+    #[test]
+    fn an_off_click_outlives_the_value_it_removed() {
+        // The same three facts with the click recorded. Writing the value again
+        // here would undo a gesture nobody withdrew, which is the whole reason
+        // an absent value could not simply be written back unconditionally.
+        assert_eq!(
+            autostart_plan(true, true, false, true),
+            AutostartPlan::Reassert
+        );
+    }
+
+    #[test]
+    fn a_value_that_is_present_is_left_to_the_reassertion() {
+        // Task Manager's off switch leaves the value in the key and marks it
+        // off in StartupApproved. Writing it again would set that record back
+        // to enabled and undo the switch, so a value that exists keeps this
+        // branch out of it whichever way the off record reads. The rule that an
+        // off switch outranks a stale path stays where it already lives.
+        for off_chosen in [false, true] {
+            assert_eq!(
+                autostart_plan(true, off_chosen, true, true),
+                AutostartPlan::Reassert,
+                "off_chosen {off_chosen}"
+            );
+        }
+    }
+
+    #[test]
+    fn a_build_tree_writes_nothing_it_was_not_asked_for() {
+        // The rail in autostart.rs, checked at the branch that would otherwise
+        // walk around it: a working tree with no value in the key is exactly
+        // the shape the re-arm fires on.
+        assert_eq!(
+            autostart_plan(false, false, false, false),
+            AutostartPlan::NoDefault
+        );
+        assert_eq!(
+            autostart_plan(true, false, false, false),
+            AutostartPlan::Reassert
+        );
+    }
+
+    #[test]
+    fn the_first_run_default_reads_nothing_but_the_question_being_open() {
+        // Nobody has been asked, so there is no click to have recorded and no
+        // value to have kept. Pinned anyway, because an unanswered question and
+        // a recorded on click look identical in the off flag alone, and a plan
+        // that consulted it here would make the two indistinguishable.
+        for value_present in [false, true] {
+            assert_eq!(
+                autostart_plan(false, false, value_present, true),
+                AutostartPlan::DefaultOn,
+                "value_present {value_present}"
+            );
+        }
+    }
+
+    /// The same failure against the real Run key, rather than against booleans.
+    ///
+    /// Everything above is a table. This one puts a value in the key, deletes
+    /// it the way the uninstaller does, asks the plan what the next launch
+    /// makes of that, and checks the bytes come back.
+    ///
+    /// Safety: the name carries this process id and the word selftest, so it
+    /// cannot collide with the value an installed copy owns. It asserts the
+    /// name is not the product's before it writes anything, and it removes both
+    /// the Run value and the StartupApproved companion afterwards.
+    #[cfg(windows)]
+    #[test]
+    fn a_wiped_run_value_is_really_written_again_at_the_next_launch() {
+        let name = format!("photo-pigeon-rearm-selftest-{}", std::process::id());
+        assert!(
+            !name.eq_ignore_ascii_case("photo-pigeon") && !name.eq_ignore_ascii_case("Photo Pigeon"),
+            "a test may never write the value an installed copy owns"
+        );
+        assert_eq!(
+            autostart::recorded_value(&name),
+            None,
+            "{name} was already in the Run key"
+        );
+
+        let exe = std::path::Path::new(
+            "C:\\Users\\Test Person\\AppData\\Local\\Photo Pigeon\\photo-pigeon.exe",
+        );
+        let auto = Autostart::scoped(&name, exe);
+
+        // The install: the default fires and the value lands.
+        if let Err(why) = auto.enable() {
+            let _ = auto.disable();
+            eprintln!("skipped: this machine would not take a Run value ({why})");
+            return;
+        }
+        assert!(autostart::recorded_value(&name).is_some());
+
+        // The uninstall: one DeleteRegValue, and the shell's own state file is
+        // outside everything the uninstaller reaches, so the flags stand.
+        auto.disable().expect("the value comes back out");
+        assert_eq!(autostart::recorded_value(&name), None);
+        let decided = true;
+        let off_chosen = false;
+
+        // The launch after the reinstall.
+        let plan = autostart_plan(
+            decided,
+            off_chosen,
+            autostart::recorded_value(&name).is_some(),
+            auto.may_default_on(),
+        );
+        assert_eq!(plan, AutostartPlan::ReArm);
+        assert!(!auto.is_enabled(), "nothing is on before the launch acts");
+        auto.enable().expect("the launch writes the value again");
+
+        assert_eq!(
+            autostart::recorded_value(&name).as_deref(),
+            Some(
+                "\"C:\\Users\\Test Person\\AppData\\Local\\Photo Pigeon\\photo-pigeon.exe\" --autostart"
+            ),
+            "start with Windows is still dead after the reinstall"
+        );
+        assert!(auto.is_enabled());
+
+        auto.disable().expect("the value comes back out");
+        assert_eq!(
+            autostart::recorded_value(&name),
+            None,
+            "the test left a Run value behind"
+        );
+        autostart::clean_startup_approved(&name);
     }
 
     #[test]

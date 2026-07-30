@@ -180,8 +180,13 @@ impl Autostart {
 
     /// For tests, and for nothing else: an instance pointed at a name and an
     /// exe of the caller's choosing.
+    ///
+    /// Reachable across the crate because the launch-time rule that decides
+    /// whether a wiped value is written again lives in `supervisor.rs`, and a
+    /// rule about the Run key that is only ever checked against booleans is a
+    /// rule nobody has watched touch a registry.
     #[cfg(test)]
-    fn scoped(name: &str, exe: &Path) -> Self {
+    pub(crate) fn scoped(name: &str, exe: &Path) -> Self {
         Self {
             name: name.to_string(),
             exe: exe.to_path_buf(),
@@ -397,6 +402,28 @@ fn wide(text: &str) -> Vec<u16> {
         .collect()
 }
 
+/// `auto-launch` writes a StartupApproved record on enable and does not remove
+/// it on disable. Under a test name that is litter, so a test takes it out
+/// itself. Crate visible because the launch-time rule is tested from
+/// `supervisor.rs` against the same real key.
+#[cfg(all(windows, test))]
+pub(crate) fn clean_startup_approved(name: &str) {
+    use std::ptr;
+    use windows_sys::Win32::System::Registry::{
+        RegCloseKey, RegDeleteValueW, RegOpenKeyExW, HKEY, HKEY_CURRENT_USER, KEY_SET_VALUE,
+    };
+    let key = wide(r"Software\Microsoft\Windows\CurrentVersion\Explorer\StartupApproved\Run");
+    let value = wide(name);
+    let mut handle: HKEY = ptr::null_mut();
+    // SAFETY: both strings are NUL terminated and outlive the calls.
+    unsafe {
+        if RegOpenKeyExW(HKEY_CURRENT_USER, key.as_ptr(), 0, KEY_SET_VALUE, &mut handle) == 0 {
+            RegDeleteValueW(handle, value.as_ptr());
+            RegCloseKey(handle);
+        }
+    }
+}
+
 /// Did this launch come from the Run key?
 ///
 /// Recorded rather than branched on: there is no window to suppress, so a boot
@@ -586,27 +613,6 @@ mod tests {
         // to read, but leaving it would leave litter under a test name, so it
         // goes too.
         clean_startup_approved(&name);
-    }
-
-    /// `auto-launch` writes a StartupApproved record on enable and does not
-    /// remove it on disable. Under a test name that is litter, so the test
-    /// takes it out itself.
-    #[cfg(windows)]
-    fn clean_startup_approved(name: &str) {
-        use std::ptr;
-        use windows_sys::Win32::System::Registry::{
-            RegCloseKey, RegDeleteValueW, RegOpenKeyExW, HKEY, HKEY_CURRENT_USER, KEY_SET_VALUE,
-        };
-        let key = wide(r"Software\Microsoft\Windows\CurrentVersion\Explorer\StartupApproved\Run");
-        let value = wide(name);
-        let mut handle: HKEY = ptr::null_mut();
-        // SAFETY: both strings are NUL terminated and outlive the calls.
-        unsafe {
-            if RegOpenKeyExW(HKEY_CURRENT_USER, key.as_ptr(), 0, KEY_SET_VALUE, &mut handle) == 0 {
-                RegDeleteValueW(handle, value.as_ptr());
-                RegCloseKey(handle);
-            }
-        }
     }
 
     #[cfg(windows)]

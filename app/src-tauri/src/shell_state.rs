@@ -58,6 +58,25 @@ struct Flags {
     // forgotten by the upgrade.
     /// Has "start with Windows" been decided once, either way?
     autostart_decided: bool,
+    /// Did a person turn it off on purpose?
+    ///
+    /// `autostart_decided` cannot carry this on its own, and the gap is what
+    /// made autostart die on a reinstall. The NSIS uninstaller deletes the Run
+    /// value by design and spares this file by design, so the relaunched shell
+    /// came up with the question settled, nothing in the key, and no way to
+    /// tell an uninstaller's wipe from a click. It read the absence as the
+    /// click, respected it, and never wrote the value again.
+    ///
+    /// So the click is written down where the wipe cannot reach it. An absent
+    /// value with nothing recorded behind it is a value to write again; an
+    /// absent value with this flag set is somebody's choice and stays absent.
+    ///
+    /// One honest trade, and it is worth naming rather than hiding: a machine
+    /// that turned the checkbox off before this flag existed has no click
+    /// recorded, so its first launch after the upgrade turns start with Windows
+    /// back on once, and the next off click sticks for good. Acceptable because
+    /// there is no such machine: 0.1.0 was never published.
+    autostart_off_chosen: bool,
 }
 
 /// The file, loaded once and written through on every change.
@@ -105,6 +124,23 @@ impl ShellState {
             self.flags.autostart_decided = true;
             self.save();
         }
+    }
+
+    pub fn autostart_off_chosen(&self) -> bool {
+        self.flags.autostart_off_chosen
+    }
+
+    /// Record which way somebody just set the switch.
+    ///
+    /// Called after a write that landed, never after one that was asked for:
+    /// a refused write leaves the registry where it was, and a record of a
+    /// choice the machine never took is worse than no record at all.
+    pub fn note_autostart_choice(&mut self, on: bool) {
+        if self.flags.autostart_off_chosen == !on {
+            return;
+        }
+        self.flags.autostart_off_chosen = !on;
+        self.save();
     }
 
     fn save(&self) {
@@ -181,6 +217,42 @@ mod tests {
         .expect("write");
         let state = ShellState::open(path);
         assert!(state.autostart_decided());
+        let _ = std::fs::remove_dir_all(&dir);
+    }
+
+    #[test]
+    fn an_off_click_is_written_down_and_survives_a_restart() {
+        // The half `autostart_decided` cannot carry. Without it an absent Run
+        // value reads the same whether a person cleared it or an uninstaller
+        // did, and those two want opposite answers.
+        let dir = scratch("off-chosen");
+        let path = dir.join(FILE_NAME);
+        let mut state = ShellState::open(path.clone());
+        assert!(!state.autostart_off_chosen());
+
+        state.note_autostart_choice(false);
+        assert!(ShellState::open(path.clone()).autostart_off_chosen());
+
+        // And turning it back on clears it, so one off click does not follow
+        // somebody around for the life of the install.
+        let mut state = ShellState::open(path.clone());
+        state.note_autostart_choice(true);
+        assert!(!ShellState::open(path).autostart_off_chosen());
+        let _ = std::fs::remove_dir_all(&dir);
+    }
+
+    #[test]
+    fn a_file_written_before_the_off_click_was_recorded_still_loads() {
+        // Every state file that exists predates this flag. A missing member has
+        // to read as "nobody has clicked it off", because that is the reading
+        // that puts a wiped value back rather than the one that treats an
+        // upgraded machine as having chosen off.
+        let dir = scratch("no-off-key");
+        let path = dir.join(FILE_NAME);
+        std::fs::write(&path, r#"{"autostartDecided":true}"#).expect("write");
+        let state = ShellState::open(path);
+        assert!(state.autostart_decided());
+        assert!(!state.autostart_off_chosen());
         let _ = std::fs::remove_dir_all(&dir);
     }
 
