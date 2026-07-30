@@ -212,7 +212,12 @@ function Wait-For {
 function Get-PigeonProcesses {
   param([Parameter(Mandatory)][string]$ExeName)
   $bare = [System.IO.Path]::GetFileNameWithoutExtension($ExeName)
-  return @(Get-Process -Name $bare -ErrorAction SilentlyContinue)
+  # The comma keeps the return from enumerating: a bare @() does not survive the
+  # function boundary, so an empty result would reach callers as $null, and
+  # Windows PowerShell 5.1 (the engine inside the sandbox) refuses .Count on
+  # $null under strict mode. The .Count call sites below all rely on this
+  # arriving as an array, whatever it holds.
+  return ,@(Get-Process -Name $bare -ErrorAction SilentlyContinue)
 }
 
 <#
