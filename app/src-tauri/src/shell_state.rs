@@ -1,5 +1,5 @@
-//! The two facts the shell has to remember between launches, and nowhere else
-//! to put them.
+//! The facts the shell has to remember between launches, and nowhere else to
+//! put them.
 //!
 //! Both are about the shell and not about deliveries, so neither belongs in the
 //! core's state directory. TRAY-DESIGN section 0: **only the core process
@@ -15,6 +15,10 @@
 //! * **`autostartDecided`.** Start with Windows is default on, and a default is
 //!   applied once. Without this flag, turning it off would be undone by the next
 //!   launch, which is not a default, it is a nag.
+//! * **`autostartOffChosen`.** Whether an off state is somebody's click or
+//!   somebody else's deletion. The two look identical in the registry, and they
+//!   want opposite answers: a click is respected forever, and a Run value the
+//!   uninstaller took goes back at the next launch.
 //!
 //! Where it lives: beside the shell's own log. One rule, so
 //! `PHOTO_PIGEON_SHELL_LOG` redirects both files at once and a test run can

@@ -672,13 +672,21 @@ impl Supervisor {
     ///    is applied once ever, against a flag on disk, because a default that
     ///    reapplied itself every launch would not be a default, it would undo
     ///    the user's choice every morning.
-    /// 2. **The re-assertion.** TRAY-DESIGN section 4's second failure mode: an
+    /// 2. **The re-arm.** The question is settled, nobody clicked it off, and
+    ///    the value is gone anyway. The uninstaller is the ordinary way to get
+    ///    here: it deletes the Run value and spares this shell's state file,
+    ///    both by design, so before the off click was written down a reinstall
+    ///    came up with start with Windows silently dead for good.
+    /// 3. **The re-assertion.** TRAY-DESIGN section 4's second failure mode: an
     ///    installed app that moves leaves the value pointing at nothing and boot
     ///    silently fails. The rename this project has already done once is an
     ///    instance of exactly that, and the only reason no machine is stranded
     ///    today is that M0 left the value absent, which is luck.
-    /// 3. **The read back**, which is what the checkbox renders. Never a
+    /// 4. **The read back**, which is what the checkbox renders. Never a
     ///    remembered preference.
+    ///
+    /// Which of the first three happens is [`autostart_plan`], which is pure
+    /// and therefore checkable without an `AppHandle`.
     fn settle_autostart(&mut self) {
         self.log.line(&format!(
             "autostart value name {:?}, scope {:?}, would write {:?}",
@@ -715,6 +723,10 @@ impl Supervisor {
                     // answer it on the installed copy's behalf, and the two
                     // share this file's directory.
                     self.shell_state.note_autostart_decided();
+                    // And which way it went, which is what a later launch reads
+                    // when it finds the value missing. The default is an on
+                    // answer as much as a click is.
+                    self.shell_state.note_autostart_choice(true);
                 }
                 Err(why) => self
                     .log
@@ -766,10 +778,19 @@ impl Supervisor {
             self.autostart.enable()
         };
         match result {
-            Ok(()) => self.log.line(&format!(
-                "start with Windows turned {}",
-                if on_now { "off" } else { "on" }
-            )),
+            Ok(()) => {
+                self.log.line(&format!(
+                    "start with Windows turned {}",
+                    if on_now { "off" } else { "on" }
+                ));
+                // The menu's check item is the other door onto the same switch,
+                // and a launch that finds the value missing has no way to tell
+                // which door an off click came through. Recording it only here
+                // and not in the window's toggle would make a tray off click
+                // look like an uninstaller's wipe, and the next launch would
+                // turn it back on.
+                self.shell_state.note_autostart_choice(!on_now);
+            }
             Err(why) => self.log.line(&format!(
                 "start with Windows could not be turned {}: {why}",
                 if on_now { "off" } else { "on" }
@@ -825,9 +846,15 @@ impl Supervisor {
             self.autostart.disable()
         };
         match result {
-            Ok(()) => self
-                .log
-                .line(&format!("start with Windows set to {want} from a window")),
+            Ok(()) => {
+                self.log
+                    .line(&format!("start with Windows set to {want} from a window"));
+                // Which way it went, and only when the write landed. A refused
+                // write leaves the registry where it was, and a record of a
+                // choice the machine never took would send the next launch the
+                // wrong way about a value it finds missing.
+                self.shell_state.note_autostart_choice(want);
+            }
             Err(why) => self
                 .log
                 .line(&format!("start with Windows could not be set to {want}: {why}")),
@@ -2046,13 +2073,26 @@ fn autostart_plan(
     value_present: bool,
     may_default_on: bool,
 ) -> AutostartPlan {
-    let _ = (off_chosen, value_present);
     if !decided {
         return if may_default_on {
             AutostartPlan::DefaultOn
         } else {
             AutostartPlan::NoDefault
         };
+    }
+    // The question is settled and the value is gone. Only two things remove it:
+    // a person, and something that is not this app. A person's removal is on
+    // disk in `off_chosen`, so an absence with nothing behind it is an
+    // uninstaller, a cleaner or a hand at regedit, and the recorded answer is
+    // still on. Writing it again is keeping the recorded answer true, which is
+    // the same job the re-assertion does for a path that moved.
+    //
+    // A value that is present is never this branch's business, whichever way
+    // the off flag reads. Task Manager's off switch leaves the value in the key
+    // and marks it off in StartupApproved, so it lands in the re-assertion,
+    // where an off switch already outranks a stale path.
+    if !value_present && !off_chosen && may_default_on {
+        return AutostartPlan::ReArm;
     }
     AutostartPlan::Reassert
 }
