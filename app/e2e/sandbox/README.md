@@ -50,9 +50,9 @@ hands:
   before it is walked.
 - **No mark of the web.** The installer arrives through a mapped folder, which
   carries no `Zone.Identifier`, so **SmartScreen has nothing to warn about and
-  the wall never appears**. The real screenshot the README and the Release page
-  need can only be taken on a machine that downloaded the file in a browser and
-  has never run it before.
+  the wall never appears**. The real wall shows only on a machine that
+  downloaded the file in a browser and has never run it before, and nothing
+  waits on a capture of it: the docs describe the wall in words.
 - **No genuinely dead core.** The red badge icon state exists and can only be
   seen by eye while a core really will not start. This rig cannot construct that
   state and neither can any other rig in this repository.
