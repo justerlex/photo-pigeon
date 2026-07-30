@@ -1,0 +1,95 @@
+# Every push to main and every pull request, on the platform the product runs on.
+#
+# One job on purpose. The Rust suite cannot run until the sidecar is staged, and
+# the sidecar is an 85 MB node.exe plus a 1.7 MB bundle, so splitting this in two
+# would mean either building it twice or passing it between runners. Ordering
+# inside one job is the cheaper gate and it is the one TRAY-DESIGN section 5 asks
+# for: stage first, then Rust.
+#
+# Windows and not ubuntu, which is a deliberate departure from section 5's "test
+# (ubuntu, fast)". The core suite has only ever been green on Windows, it holds
+# file locks, path and ledger behaviour, and proving it on Linux is a new claim
+# to make rather than a box to tick. The product is a Windows tray. A Linux gate
+# can be added the day something needs it.
+#
+# The e2e rig in app/e2e is not here, and that is not an omission. It is Windows
+# PowerShell that launches real trays and waits on a tray icon, an HKCU Run value
+# and a pair of eyes. A hosted runner has no desktop session to put a tray in, so
+# a green rig here would mean nothing at all. It is walked by hand, per
+# app/e2e/CHECKLIST.md, and the M5 pass in that file is the pre-publish must.
+name: ci
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: ${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
+env:
+  # The Node that ships inside the installer. app/scripts/build-sidecar.mjs stages
+  # the interpreter that runs it, and it REFUSES any version other than the pin in
+  # app/scripts/sidecar-layout.json, because the core's durability guarantees were
+  # measured on that build. A runner default of the day fails the staging step with
+  # a message about exactly that, so the pin lives here too and a test holds the
+  # two copies together (scripts/workflows.test.ts).
+  PIGEON_NODE: '22.18.0'
+
+jobs:
+  windows:
+    name: both suites, windows
+    runs-on: windows-latest
+    timeout-minutes: 45
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: ${{ env.PIGEON_NODE }}
+          cache: npm
+          cache-dependency-path: |
+            package-lock.json
+            app/package-lock.json
+
+      - name: install the core's dependencies
+        run: npm ci
+
+      # First, because it is a second of work and it invalidates everything after
+      # it. Lockstep versioning: one version, one number. No tag on this road, so the tag is
+      # not compared here.
+      - name: version lockstep
+        run: node scripts/check-versions.mjs
+
+      - name: the core suite
+        run: npm test
+
+      - name: install the shell's build dependencies
+        run: npm ci
+        working-directory: app
+
+      - uses: dtolnay/rust-toolchain@stable
+
+      - uses: Swatinem/rust-cache@v2
+        with:
+          workspaces: app/src-tauri
+
+      # BEFORE anything Rust, and this is the ordering CI cannot guess.
+      # tauri.conf.json names binaries/ and resources/ in externalBin and
+      # resources, both are gitignored, and a fresh clone has neither, so a Rust
+      # build fails until they exist. app/package.json wires this to prebuild for
+      # a human, but nothing here goes through that script.
+      #
+      # It also runs tsc over the core, so a type error fails this job even though
+      # nothing else here compiles TypeScript.
+      - name: stage the sidecar and the core bundle
+        run: node app/scripts/build-sidecar.mjs
+
+      - name: the shell suite
+        run: cargo test
+        working-directory: app/src-tauri

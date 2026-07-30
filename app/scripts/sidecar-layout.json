@@ -1,0 +1,188 @@
+{
+  "$comment": [
+    "The contract between the bundling pipeline and the Rust shell.",
+    "WRITER: app/scripts/build-sidecar.mjs. READERS: app/src-tauri/src/paths.rs and",
+    "app/src-tauri/tauri.conf.json, whose bundle.externalBin and bundle.resources must match",
+    "'externalBin' and 'bundleResources' below word for word.",
+    "Nothing else may hardcode these names. If you are about to write a path literal in",
+    "main.rs, read it from here instead.",
+    "Background: docs/TRAY-DESIGN.md section 2 (Packaging a Node core as a sidecar binary)",
+    "and section 5 (Repo shape and release)."
+  ],
+
+  "coreBundle": "resources/core.mjs",
+  "$coreBundleIsEsm": [
+    "core.mjs, NOT core.cjs. TRAY-DESIGN says core.cjs and TRAY-DESIGN is wrong about the",
+    "extension, for a reason nobody could have known before trying it: src/cli.ts ends in a",
+    "top level await, and esbuild refuses that outright with the cjs output format. It is a",
+    "build error, not a preference. Node decides a file's module system by extension and an",
+    ".cjs file containing ESM is a syntax error, so the name has to follow the format.",
+    "Everything that names this file reads it from here."
+  ],
+
+  "sidecarName": "pigeon-core",
+  "externalBin": ["binaries/pigeon-core"],
+  "bundleResources": [
+    "resources/core.mjs",
+    "resources/NODE-LICENSE.txt",
+    "resources/core-manifest.json"
+  ],
+
+  "nodeLicense": "resources/NODE-LICENSE.txt",
+  "manifest": "resources/core-manifest.json",
+
+  "nodeVersion": "v22.18.0",
+  "defaultTargetTriple": "x86_64-pc-windows-msvc",
+
+  "env": {
+    "$comment": [
+      "Owned by app/src-tauri/src/paths.rs (env_names). Repeated here so the two sides",
+      "cannot drift. The build script takes --node instead of an env var on purpose, so a",
+      "build time override can never be confused with the runtime one."
+    ],
+    "config": "PHOTO_PIGEON_CONFIG",
+    "coreJs": "PHOTO_PIGEON_CORE_JS",
+    "node": "PHOTO_PIGEON_NODE",
+    "shellLog": "PHOTO_PIGEON_SHELL_LOG"
+  },
+
+  "spawn": {
+    "$comment": [
+      "The sidecar IS node.exe, renamed. So the first argument to the child is the core",
+      "bundle, which the shell must pass as an ABSOLUTE path resolved from the resource dir.",
+      "watchArgs is the literal argument vector with the two placeholders substituted.",
+      "-c comes after the subcommand on purpose: watch declares its own -c and configOf() in",
+      "src/commands/index.ts accepts it on either side."
+    ],
+    "watchArgs": [
+      "{coreBundleAbsPath}",
+      "watch",
+      "--events",
+      "ndjson",
+      "-c",
+      "{configPath}"
+    ],
+    "watchArgsNoConfig": ["{coreBundleAbsPath}", "watch", "--events", "ndjson"],
+
+    "$m4Args": [
+      "M4. setup is the same machine channel the watch command has had since M1, and it is",
+      "what the first run window spawns: one JSON line per event on stdout, human prose on",
+      "stderr, and one payload-carrying stdin form. docs/ASK-PROTOCOL.md is the contract.",
+      "doctor takes -c as of M4, alongside --json. It used to take neither, on the grounds",
+      "that it checks the setup the wizard made in the folder the wizard owns; the wizard makes",
+      "one wherever -c says, and a tray running against an override has to ask about the setup",
+      "it is really using. Without it the health window on a development machine or under the",
+      "rig would report on the machine's real ~/.photo-pigeon, which the safety rules forbid.",
+      "--json is a passthrough of the DoctorReport that src/wizard/doctor.ts has always",
+      "produced, past the layer that flattened it for a terminal."
+    ],
+    "setupArgs": ["{coreBundleAbsPath}", "setup", "--events", "ndjson", "-c", "{configPath}"],
+    "setupArgsNoConfig": ["{coreBundleAbsPath}", "setup", "--events", "ndjson"],
+    "doctorArgs": ["{coreBundleAbsPath}", "doctor", "--json", "-c", "{configPath}"],
+    "doctorArgsNoConfig": ["{coreBundleAbsPath}", "doctor", "--json"],
+    "answerWord": "answer",
+    "stopLine": "stop\n",
+    "stoppedEventType": "stopped",
+
+    "$foldersArgs": [
+      "Editing the watched folder list from the status window. One request, one JSON",
+      "line on stdout, human prose on stderr: the shape doctor --json already has, and",
+      "not the ndjson stream watch and setup use, because there is no run here to",
+      "narrate and no stopped event to end it with. src/commands/folders.ts is the",
+      "contract and it answers every request, including the ones that change nothing.",
+      "{foldersAction} is add or remove. {folderPath} is a string the page received",
+      "from ipc::pick_folder or out of the core's own started event, handed straight",
+      "back for the core to validate exactly as it validates a path a terminal user",
+      "typed. The shell never reads it and never writes it."
+    ],
+    "foldersArgs": [
+      "{coreBundleAbsPath}",
+      "folders",
+      "{foldersAction}",
+      "{folderPath}",
+      "--json",
+      "-c",
+      "{configPath}"
+    ],
+    "foldersArgsNoConfig": [
+      "{coreBundleAbsPath}",
+      "folders",
+      "{foldersAction}",
+      "{folderPath}",
+      "--json"
+    ],
+
+    "$m3Words": [
+      "The four words M3 added to the core's stdin vocabulary, plus the event that",
+      "confirms the one of them that matters most. paths.rs already carries these exact",
+      "strings as serde defaults, so naming them here changes no behaviour today; it",
+      "makes them renameable from one file tomorrow, and it gives app/e2e/run-m3.ps1 a",
+      "contract to read that a Rust drift test holds the shell to.",
+      "detach is NOT stop: see docs/TRAY-DESIGN.md section 2, the detach protocol."
+    ],
+    "pauseLine": "pause\n",
+    "resumeLine": "resume\n",
+    "rescanLine": "rescan\n",
+    "detachLine": "detach\n",
+    "detachedEventType": "detached"
+  },
+
+  "autostart": {
+    "$comment": [
+      "Start with Windows, M3. WRITER: app/src-tauri/src/autostart.rs, which drives",
+      "auto-launch 0.5 directly rather than tauri-plugin-autostart, because the plugin",
+      "physically cannot write a quoted value. READER: app/e2e/run-m3.ps1, which prefers",
+      "this block over its own m3-vocabulary.json fallback.",
+      "runValueName MUST equal tauri.conf.json productName: the generated installer.nsi",
+      "uninstalls with DeleteRegValue HKCU \"...\\Run\" \"${PRODUCTNAME}\", so a value under",
+      "any other name outlives the uninstall forever.",
+      "The value DATA is quoted and the flag sits outside the closing quote:",
+      "  \"C:\\Users\\...\\AppData\\Local\\Photo Pigeon\\photo-pigeon.exe\" --autostart",
+      "The install directory contains a space on every machine now, so the quoting is",
+      "load bearing rather than prudent. Background: docs/TRAY-DESIGN.md sections 4 and 6."
+    ],
+    "runValueName": "Photo Pigeon",
+    "bootFlag": "--autostart",
+    "nameEnv": "PHOTO_PIGEON_AUTOSTART_NAME",
+    "shellLogBootMarker": "boot flag"
+  },
+
+  "resolution": {
+    "$comment": [
+      "How the shell finds the core bundle at runtime, dev and installed.",
+      "On Windows tauri_utils::platform::resource_dir_from returns the exe directory",
+      "unconditionally (platform.rs, the `if cfg!(target_os = \"windows\") || ...` branch), so",
+      "resource_dir() and the exe dir are the same directory in BOTH cases and one join",
+      "covers both. tauri-build's build.rs copies bundle.resources into the cargo target dir",
+      "keeping the relative path (tauri_utils::resources::resource_relpath), and copies",
+      "externalBin next to the exe with the target triple suffix stripped and the directory",
+      "dropped. The NSIS bundler lays the install directory out the same way."
+    ],
+    "windows": {
+      "coreBundle": "resource_dir().join(\"resources/core.mjs\")",
+      "sidecarExe": "exe_dir/pigeon-core.exe, or via tauri-plugin-shell sidecar(\"pigeon-core\")",
+      "devLayout": "app/src-tauri/target/{debug,release}/{pigeon-core.exe, resources/core.mjs}",
+      "installedLayout": "%LOCALAPPDATA%/Photo Pigeon/{photo-pigeon.exe, pigeon-core.exe, resources/core.mjs}"
+    },
+    "order": [
+      "1. PHOTO_PIGEON_CORE_JS set and non empty: use it verbatim, skip everything else.",
+      "   This is the seam that lets a test, or a dev iterating on the core, point the tray",
+      "   at ../../dist/cli.js without a rebuild. Node runs the unbundled ESM CLI exactly as",
+      "   well as it runs the bundle.",
+      "2. installed layout: exe_dir/pigeon-core.exe plus resource_dir()/resources/core.mjs.",
+      "   This also matches under tauri dev, because tauri-build stages both into the cargo",
+      "   target dir, so dev exercises the shipped shape rather than a second one.",
+      "3. dev fallback: system node over <repo>/dist/cli.js."
+    ]
+  },
+
+  "verify": {
+    "$comment": "node scripts/smoke-sidecar.mjs runs all of this against a temp config.",
+    "afterBuild": [
+      "<sidecar> <coreBundle> --version prints the root package.json version",
+      "<sidecar> <coreBundle> --help works from a directory with no node_modules above it",
+      "<sidecar> <coreBundle> setup --help works, so @inquirer/prompts is really in the bundle",
+      "a watch against a temp config writes only JSON on stdout and ends with a stopped event"
+    ]
+  }
+}

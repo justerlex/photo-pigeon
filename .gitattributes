@@ -1,0 +1,25 @@
+# Line endings, pinned, because a checkout that differs from the tree the tests
+# were written against is a suite that passes for its author and fails for
+# everybody else.
+#
+# The failure this prevents: with `core.autocrlf=true`, which is the Windows
+# default and can come from the system config, every file git materialises gets
+# CRLF, and vitest cannot load a `.mjs` with CRLF in it. The symptom is
+# `SyntaxError: Invalid or unexpected token` with no file, no line and no stack.
+# It is invisible to whoever wrote the file, because git does not rewrite a
+# working file it has just read: only a fresh checkout gets the conversion, and
+# a fresh checkout is exactly what CI does.
+#
+# `text=auto` keeps git's own binary detection, `eol=lf` says what the working
+# tree gets. Nothing in the repository changes: the index has always held LF,
+# because autocrlf normalises on the way in. This file only settles what comes
+# back out.
+* text=auto eol=lf
+
+# The binaries this repo actually carries, named rather than left to detection,
+# because a PNG that gets line-ending treatment is a corrupt PNG and the icons
+# are the app's face.
+*.png binary
+*.ico binary
+*.icns binary
+*.woff2 binary

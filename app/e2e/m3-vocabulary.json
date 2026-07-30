@@ -1,0 +1,87 @@
+{
+  "$comment": [
+    "What run-m3.ps1 expects the M3 core and the M3 shell to say. One file, so a",
+    "rename on either side costs an edit here rather than a hunt through a rig.",
+    "",
+    "WRITERS OF THE TRUTH: src/commands/watch.ts (STDIN_WORDS and WatchEventBody)",
+    "for the words and the events, app/src-tauri/src/paths.rs plus",
+    "app/scripts/sidecar-layout.json for the autostart facts.",
+    "READER: app/e2e/run-m3.ps1.",
+    "",
+    "The autostart block below is a fallback only. When",
+    "app/scripts/sidecar-layout.json carries an `autostart` block, that one wins,",
+    "because it is the file the shell itself is held against by a drift test.",
+    "Background: docs/TRAY-DESIGN.md sections 2, 3 and 4, and the M3 blocker note",
+    "at the end of section 6."
+  ],
+
+  "words": {
+    "stop": "stop",
+    "detach": "detach",
+    "pause": "pause",
+    "resume": "resume",
+    "rescan": "rescan"
+  },
+
+  "events": {
+    "$comment": "Arrays because a rig that accepts one spelling and dies on a synonym is a rig that fails the day somebody is right.",
+    "paused": ["paused"],
+    "userPauseReason": "user",
+    "quotaPauseReason": "quota",
+    "resumed": ["resumed"],
+    "detached": ["detached"],
+    "scanning": ["scanning"],
+    "delivering": ["delivering"],
+    "stopped": "stopped"
+  },
+
+  "stderr": {
+    "$comment": [
+      "The core answers an unrecognised stdin line on stderr by name. The rig",
+      "sends a word that cannot ever be real and looks for this sentence, then",
+      "sends each M3 word and asserts the sentence does NOT appear: that is how a",
+      "word that was never wired is told apart from one that was."
+    ],
+    "unknownWord": "is not a command this build understands on stdin",
+    "impatient": "impatient"
+  },
+
+  "exitCodes": {
+    "$comment": "130 is the second-stop exit, the one that abandons the batch in flight. After a detach it is a bug.",
+    "clean": 0,
+    "impatient": 130
+  },
+
+  "autostart": {
+    "runValueName": "Photo Pigeon",
+    "$runValueName": [
+      "The Run VALUE NAME is productName, and productName is the human display",
+      "name from M3 onwards: Photo Pigeon, with the space. The machine",
+      "identifiers did not move: the exe is still photo-pigeon.exe and the",
+      "install directory is still what the bundler makes of the product name.",
+      "The rig does not depend on this: it finds photo-pigeon entries by the exe",
+      "their DATA names, which survives a rename of the product."
+    ],
+    "bootFlag": "--autostart",
+    "$bootFlag": [
+      "Settled at M3 in app/src-tauri/src/autostart.rs (BOOT_FLAG), against",
+      "section 4's --hidden. There is no window at any launch, so --hidden has",
+      "nothing to hide; the flag's only job is to say the launch came from the",
+      "Run key, and --autostart says that."
+    ],
+    "nameEnv": "PHOTO_PIGEON_AUTOSTART_NAME",
+    "$nameEnv": [
+      "The environment variable that moves the Run VALUE NAME aside so a test can",
+      "watch the shell write one without ever touching the real entry. If the",
+      "shell does not read it, every tray scenario in run-m3.ps1 refuses to launch",
+      "rather than risk writing the production value name on this machine."
+    ],
+    "shellLogBootMarker": "boot flag",
+    "$shellLogBootMarker": [
+      "A substring the shell writes to its own log when it recognises the boot",
+      "flag. It is how the rig proves the word that ships is the word the boot",
+      "path really parses, which is the disagreement M3 had to settle. Absent, the",
+      "check is a warning rather than a pass, because a silent log is not proof."
+    ]
+  }
+}

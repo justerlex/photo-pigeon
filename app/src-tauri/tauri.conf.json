@@ -1,0 +1,54 @@
+{
+  "$schema": "https://schema.tauri.app/config/2",
+  "productName": "Photo Pigeon",
+  "mainBinaryName": "photo-pigeon",
+  "version": "../../package.json",
+  "identifier": "io.github.justerlex.photopigeon",
+  "build": {
+    "frontendDist": "../ui"
+  },
+  "app": {
+    "windows": [],
+    "withGlobalTauri": true,
+    "security": {
+      "csp": "default-src 'self'; style-src 'self' 'unsafe-inline'; img-src 'self' data:"
+    }
+  },
+  "plugins": {
+    "updater": {
+      "endpoints": [
+        "https://github.com/justerlex/photo-pigeon/releases/latest/download/latest.json"
+      ],
+      "pubkey": "dW50cnVzdGVkIGNvbW1lbnQ6IG1pbmlzaWduIHB1YmxpYyBrZXk6IEIyRkQxMkI1OTM4RkJCQjIKUldTeXU0K1R0Ukw5c2xiOFREYmU3VGQ5STdINGs0T2pkNTBuMXQ3QmM0WTd6RUJObzVwRlpFWVoK",
+      "windows": {
+        "installMode": "passive"
+      }
+    }
+  },
+  "bundle": {
+    "active": true,
+    "createUpdaterArtifacts": true,
+    "targets": ["nsis"],
+    "publisher": "justerlex",
+    "shortDescription": "Watches your folders, delivers every new photo to Google Photos",
+    "externalBin": ["binaries/pigeon-core"],
+    "resources": [
+      "resources/core.mjs",
+      "resources/NODE-LICENSE.txt",
+      "resources/core-manifest.json"
+    ],
+    "icon": [
+      "icons/32x32.png",
+      "icons/128x128.png",
+      "icons/128x128@2x.png",
+      "icons/icon.icns",
+      "icons/icon.ico"
+    ],
+    "windows": {
+      "nsis": {
+        "installMode": "currentUser",
+        "installerHooks": "nsis-hooks.nsh"
+      }
+    }
+  }
+}

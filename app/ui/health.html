@@ -1,0 +1,87 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>Photo Pigeon: Status</title>
+    <!--
+      The health check.
+
+      The title above says Status on purpose, and it is not a copy-paste
+      mistake. This page is the second tab of the Status window, reached by an
+      ordinary in place navigation, so the OS window title a person reads is the
+      one windows.rs wrote when it built the window. Both documents say the same
+      words so that nothing can make the title change halfway through a visit.
+      See `Page::title` in app/src-tauri/src/windows.rs, and ui-pages.test.ts,
+      which pins all three title tags to the Rust strings.
+
+      This is the core's own DoctorReport and not a second opinion.
+      `photo-pigeon doctor` and this page read the same structure, through
+      `doctor_report` in app/src-tauri/src/ipc.rs, which is a passthrough past
+      the terminal flattening. So the two can never disagree about what is
+      wrong, which is the whole reason the command exists rather than the page
+      re-checking anything itself.
+
+      The page chrome carries data-i18n keys into app/ui/locales/en.json, per
+      TRAY-DESIGN's i18n section, and it is a scaffold only: English is the
+      text standing in this file. The rows themselves are not keyed and must not be:
+      they are the core's own DoctorReport, rendered as received, and giving the
+      core's sentences message keys is the v0.2 milestone in TRAY-DESIGN
+      section 6.
+
+      Every row is a plain sentence. The green, amber and red marks are small
+      and each one sits beside a word that says the same thing, so a person who
+      cannot tell the colours apart loses nothing.
+    -->
+    <link rel="stylesheet" href="pigeon.css" />
+  </head>
+  <body>
+    <div class="rail rail--static" aria-hidden="true">
+      <div class="rail__fill"></div>
+    </div>
+
+    <main class="page">
+      <div class="column">
+        <nav class="tabs">
+          <a href="status.html" data-i18n="common.tab.status">Status and history</a>
+          <a href="health.html" aria-current="page" data-i18n="common.tab.health">Health</a>
+
+          <!-- The language slot, as on the other two pages. Empty and hidden
+               while English is the only locale. -->
+          <div class="lang hidden" data-i18n-switcher></div>
+        </nav>
+
+        <p class="eyebrow">Photo Pigeon</p>
+        <h1 id="verdict" data-i18n="health.title">Health</h1>
+        <p class="lede" id="lede" data-i18n="health.lede">
+          Three of Google's quieter rules end small uploaders, and all three are
+          invisible until they bite. This is the same check the command line
+          runs.
+        </p>
+
+        <section class="section">
+          <h2 data-i18n="health.checks.heading">What the check found</h2>
+          <ul class="list" id="checks">
+            <li><span class="what empty" data-i18n="health.checking">Checking...</span></li>
+          </ul>
+          <div class="actions">
+            <button type="button" class="primary" id="run-doctor" data-i18n="health.checkAgain">
+              Check again
+            </button>
+            <button type="button" id="open-log" data-i18n="common.openLog">Open log</button>
+          </div>
+        </section>
+
+        <footer>
+          <p data-i18n="health.footer">
+            A console link on a row is text to copy. Photo Pigeon opens links
+            from its own process and never from this window.
+          </p>
+        </footer>
+      </div>
+    </main>
+    <!-- The language scaffold first: health.js takes t() off it. -->
+    <script src="i18n.js"></script>
+    <script src="health.js"></script>
+  </body>
+</html>

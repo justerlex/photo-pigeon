@@ -1,0 +1,462 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>Photo Pigeon: Setup</title>
+    <!--
+      First run, without a terminal. TRAY-DESIGN's first-run window.
+
+      This page is a front end and not a wizard. The state machine is the same
+      one `photo-pigeon setup` has always run, in the core, and it reaches this
+      window as NDJSON over the `setup-event` channel. Every question is an
+      `ask` event and every answer goes back through `setup_answer`, which is
+      the one payload-carrying stdin form in this project.
+      docs/ASK-PROTOCOL.md is the contract.
+
+      Three things this page deliberately does not do:
+
+        * It does not validate. A rule the page re-implements is a rule that
+          will disagree with the terminal one. It sends the answer and renders
+          the sentence the core sends back.
+        * It does not open a link. The core hands console links to the system
+          browser from its own process. That is the same rule that keeps
+          Google's consent screen out of this window, stated once for both.
+        * It does not read or write a file. tauri-plugin-fs rides in
+          transitively under the dialog plugin, so the guarantee is the
+          ungranted permission: no fs grant reaches any window.
+          A dragged file and a picked folder both arrive here as a plain
+          string and go straight back to the core, which validates them
+          exactly as it validates a path a terminal user typed.
+
+      The copy is the wizard's own wherever the wizard has a sentence. The
+      storage honesty sentence appears word for word, from STORAGE_HONESTY in
+      src/commands/watch.ts.
+
+      The page chrome carries data-i18n keys into app/ui/locales/en.json, which
+      is TRAY-DESIGN's i18n section and a scaffold only: English is the text
+      standing in this file, so with one locale nothing loads and nothing is replaced.
+      What is deliberately NOT keyed is every sentence another process owns, the
+      wizard's prose and the storage honesty sentence among them. They render as
+      received, because this window is a surface for the core's words and not a
+      second author of them, and carrying message keys on those events is the
+      v0.2 milestone in TRAY-DESIGN section 6.
+    -->
+    <link rel="stylesheet" href="pigeon.css" />
+  </head>
+  <body>
+    <!--
+      The airmail edge. The one bold element in the package: a par avion stripe
+      that fills as the walk advances. It is the progress rail and it is the
+      only saturated area on the screen.
+    -->
+    <div
+      class="rail"
+      id="rail"
+      role="progressbar"
+      aria-label="Setup progress"
+      data-i18n-attr="aria-label:setup.rail.label"
+      aria-valuemin="0"
+      aria-valuemax="100"
+      aria-valuenow="0"
+    >
+      <div class="rail__fill" id="rail-fill"></div>
+    </div>
+
+    <main class="page">
+      <!--
+        The language slot, top right, per TRAY-DESIGN's i18n section. It ships
+        empty and hidden: i18n.js fills it only when the locale registry holds
+        more than one language, so with English alone this window is exactly the
+        one that was designed. The switcher's options are the registry rather than
+        markup, because a list of languages written here would be a second copy
+        of the registry to forget.
+      -->
+      <div class="lang hidden" data-i18n-switcher></div>
+
+      <div class="column">
+        <p class="eyebrow" id="step-of" data-i18n="setup.eyebrow.firstRun">First run</p>
+        <h1 id="title">Photo Pigeon</h1>
+        <p class="lede" id="lede" data-i18n="setup.lede">
+          A pigeon that watches a folder and carries every new photo home to
+          Google Photos.
+        </p>
+
+        <!-- ---------------------------------------------------- welcome -->
+        <section id="welcome">
+          <div class="welcome">
+            <div class="welcome__words">
+              <p data-i18n="setup.welcome.own">
+                Setup is five screens in your browser, most of them one button.
+                You end up with your own Google Cloud project, which means your
+                own daily upload quota that nobody else shares, and credentials
+                that live only on this machine.
+              </p>
+              <p data-i18n="setup.welcome.oneDirection">
+                Nothing is ever deleted. Photo Pigeon uploads, in one direction,
+                and that is the whole of it. It cannot read your existing
+                library and it cannot remove anything from it. There is no code
+                in it that could.
+              </p>
+            </div>
+            <img
+              class="mascot"
+              src="pigeon-mascot.png"
+              alt="The Photo Pigeon mascot, a pigeon holding a camera"
+              data-i18n-attr="alt:setup.mascot.alt"
+            />
+          </div>
+
+          <!--
+            The storage law, word for word with STORAGE_HONESTY in
+            src/commands/watch.ts and STORAGE_HONESTY in app/src-tauri/src/state.rs.
+            TRAY-DESIGN section 0 requires it here, in the status window and in
+            the tooltip, and never buried in an About box. Do not paraphrase it.
+            It carries no i18n key for that reason: it is the core's sentence,
+            and it travels with the core's own words at v0.2.
+          -->
+          <p class="honesty">
+            Uploads are original quality and count against your Google storage.
+            Storage Saver does not apply.
+          </p>
+
+          <div class="section">
+            <h2 data-i18n="common.autostartHeading">Start with Windows</h2>
+            <label class="toggle">
+              <input type="checkbox" id="autostart" checked />
+              <span id="autostart-note" data-i18n="setup.autostart.note">
+                Photo Pigeon starts with Windows, so a backup tool that is meant
+                to be running is running. You can turn this off any time from
+                the tray menu.
+              </span>
+            </label>
+          </div>
+
+          <!--
+            Scary moment one, and the only one that already happened. Windows
+            SmartScreen stands between an unsigned installer and the desktop, so
+            anybody reading this screen got past it a minute ago and may still
+            be uneasy about it. One calm sentence, one line drawing.
+
+            The drawing is what ships. A screenshot of somebody else's product
+            would be a small forgery and would go stale the day they redesign.
+          -->
+          <div class="section scare">
+            <h2 data-i18n="setup.smartscreen.heading">The blue box Windows showed</h2>
+            <p class="scare__line" data-i18n="setup.smartscreen.line">
+              If Windows put up a blue box before this app opened, that was
+              SmartScreen noticing that Photo Pigeon is not signed by a big
+              publisher yet, and More info then Run anyway is the way through
+              it.
+            </p>
+            <figure class="frame">
+              <svg
+                viewBox="0 0 320 180"
+                role="img"
+                aria-label="Diagram of the SmartScreen box: a dialog with More info first and Run anyway second"
+                data-i18n-attr="aria-label:setup.smartscreen.diagram"
+              >
+                <rect class="dg-line" x="30" y="16" width="260" height="148" rx="6" />
+                <line class="dg-line" x1="30" y1="44" x2="290" y2="44" />
+                <rect class="dg-fill" x="46" y="26" width="86" height="8" rx="2" />
+                <rect class="dg-fill" x="46" y="60" width="150" height="9" rx="2" />
+                <rect class="dg-fill" x="46" y="78" width="196" height="6" rx="2" />
+                <rect class="dg-fill" x="46" y="90" width="158" height="6" rx="2" />
+                <circle class="dg-hit-fill" cx="52" cy="117" r="8" />
+                <text class="dg-num" x="52" y="121" text-anchor="middle">1</text>
+                <text class="dg-text-hit" x="68" y="121">More info</text>
+                <circle class="dg-hit-fill" cx="52" cy="145" r="8" />
+                <text class="dg-num" x="52" y="149" text-anchor="middle">2</text>
+                <rect class="dg-hit" x="66" y="134" width="80" height="22" rx="3" />
+                <text class="dg-text-hit" x="106" y="149" text-anchor="middle">Run anyway</text>
+                <rect class="dg-line" x="158" y="134" width="72" height="22" rx="3" />
+                <text class="dg-text" x="194" y="149" text-anchor="middle">Do not run</text>
+              </svg>
+              <figcaption data-i18n="setup.diagram.windows">
+                A diagram, not a screenshot of Windows.
+              </figcaption>
+            </figure>
+          </div>
+
+          <div class="actions">
+            <button type="button" class="primary" id="start" data-i18n="setup.start">
+              Start setup
+            </button>
+          </div>
+        </section>
+
+        <!-- ------------------------------------------------------- walk -->
+        <!--
+          Everything the wizard says, rendered one line per `say` event, plus
+          the one open question. The core owns the order, the wording and the
+          rules; this is a surface for them.
+        -->
+        <section id="walk" class="hidden">
+          <div id="said" aria-live="polite"></div>
+
+          <div class="ask hidden" id="ask">
+            <p class="question" id="question"></p>
+
+            <!-- A typed answer. The mono face is deliberate: most of these are
+                 paths and ids, where a lowercase L and a one have to differ. -->
+            <div class="field hidden" id="field-input">
+              <input
+                type="text"
+                id="answer-text"
+                autocomplete="off"
+                autocapitalize="off"
+                spellcheck="false"
+                aria-labelledby="question"
+              />
+              <button type="button" class="primary" id="send-text" data-i18n="setup.next">
+                Next
+              </button>
+            </div>
+
+            <div class="actions hidden" id="field-confirm">
+              <button type="button" class="primary" id="answer-yes" data-i18n="setup.yes">
+                Yes
+              </button>
+              <button type="button" id="answer-no" data-i18n="setup.notYet">Not yet</button>
+            </div>
+
+            <!-- Shown only when the open question wants a folder. The dialog is
+                 native and it runs in Rust: `pick_folder` hands back a string
+                 and the core validates it. -->
+            <div class="actions hidden" id="field-folder">
+              <button
+                type="button"
+                class="primary"
+                id="choose-folder"
+                data-i18n="setup.chooseFolder"
+              >
+                Choose folder
+              </button>
+            </div>
+
+            <!-- Shown only while the credentials question is open. -->
+            <div class="hidden" id="field-drop">
+              <div class="drop" id="drop" data-i18n="setup.drop.label">
+                Drag the downloaded JSON file here
+              </div>
+              <p class="watching" id="watching" data-i18n="setup.drop.watching">
+                Watching your Downloads folder. If the file lands there, Photo
+                Pigeon picks it up on its own.
+              </p>
+            </div>
+
+            <p class="error hidden" id="ask-error"></p>
+          </div>
+
+          <!--
+            Scary moment two, and the only one that is still ahead. It appears
+            from the publishing step onward, which is where the wizard first
+            mentions it, and it stays up through the sign in.
+
+            The drawing is what ships. A screenshot of somebody else's product
+            would be a small forgery and would go stale the day they redesign.
+          -->
+          <div class="section scare hidden" id="prewarn">
+            <h2 data-i18n="setup.unverified.heading">The page Google shows once</h2>
+            <p class="scare__line" data-i18n="setup.unverified.line">
+              The first time you sign in, Google shows a full page saying it has
+              not verified this app, and the way through is Advanced and then
+              the link underneath it.
+            </p>
+            <figure class="frame">
+              <svg
+                viewBox="0 0 320 200"
+                role="img"
+                aria-label="Diagram of Google's unverified app page: click Advanced first, then the link underneath"
+                data-i18n-attr="aria-label:setup.unverified.diagram"
+              >
+                <rect class="dg-line" x="10" y="10" width="300" height="180" rx="6" />
+                <line class="dg-line" x1="10" y1="38" x2="310" y2="38" />
+                <circle class="dg-fill" cx="26" cy="24" r="3.5" />
+                <circle class="dg-fill" cx="38" cy="24" r="3.5" />
+                <circle class="dg-fill" cx="50" cy="24" r="3.5" />
+                <rect class="dg-fill" x="70" y="20" width="200" height="9" rx="4.5" />
+                <path class="dg-line" d="M 44,58 l 12,22 h -24 z" />
+                <line class="dg-line" x1="44" y1="66" x2="44" y2="72" />
+                <rect class="dg-fill" x="72" y="58" width="180" height="9" rx="2" />
+                <rect class="dg-fill" x="72" y="76" width="212" height="6" rx="2" />
+                <rect class="dg-fill" x="72" y="88" width="168" height="6" rx="2" />
+                <circle class="dg-hit-fill" cx="42" cy="122" r="8" />
+                <text class="dg-num" x="42" y="126" text-anchor="middle">1</text>
+                <rect class="dg-hit" x="58" y="111" width="76" height="22" rx="3" />
+                <text class="dg-text-hit" x="96" y="126" text-anchor="middle">Advanced</text>
+                <circle class="dg-hit-fill" cx="42" cy="160" r="8" />
+                <text class="dg-num" x="42" y="164" text-anchor="middle">2</text>
+                <text class="dg-text-hit" x="58" y="164">Go to Photo Pigeon (unsafe)</text>
+                <line class="dg-hit" x1="58" y1="169" x2="212" y2="169" />
+              </svg>
+              <figcaption data-i18n="setup.diagram.google">
+                A diagram, not a screenshot of Google.
+              </figcaption>
+            </figure>
+          </div>
+        </section>
+
+        <!-- --------------------------------------------- waiting screen -->
+        <!--
+          The sign in happens in the system browser and the core opens it.
+          TRAY-DESIGN section 3: consent is never rendered in a WebviewWindow.
+          The `signing-in` event carries no URL on purpose, so there is nothing
+          here to render even by accident.
+        -->
+        <section id="signing" class="hidden">
+          <p data-i18n="setup.signing.line">
+            Your browser has the sign in now. Photo Pigeon waits here until it
+            is finished, and then it starts watching.
+          </p>
+        </section>
+
+        <!-- -------------------------------------------------- the finish -->
+        <section id="done" class="hidden">
+          <div class="delivery" id="delivery">
+            <div class="delivery__art">
+              <img
+                class="mascot"
+                src="pigeon-mascot.png"
+                alt=""
+                aria-hidden="true"
+              />
+              <!--
+                The postmark. Two rings, the product name arced over the top,
+                DELIVERED under the bottom, the date across the middle in the
+                mono face. Airmail red at 88 percent, because a rubber stamp
+                never lands as solid ink.
+              -->
+              <svg
+                class="postmark"
+                viewBox="0 0 200 200"
+                role="img"
+                aria-label="A postmark reading Photo Pigeon, delivered"
+                data-i18n-attr="aria-label:setup.postmark.label"
+              >
+                <defs>
+                  <!--
+                    Both arcs run left to right, and the sweep flag is what
+                    keeps each one's letters upright: 1 takes the top arc over
+                    the crown, 0 takes the bottom arc under the floor, and both
+                    put the glyph's own up vector away from the centre. Swap
+                    either flag and that half of the postmark reads upside down.
+                    The radii sit inside the inner ring by more than a cap
+                    height, so no letter touches a circle.
+                  -->
+                  <path id="pm-top" d="M 36,100 A 64,64 0 0 1 164,100" />
+                  <path id="pm-bottom" d="M 40,100 A 60,60 0 0 0 160,100" />
+                </defs>
+                <circle cx="100" cy="100" r="88" />
+                <circle cx="100" cy="100" r="79" />
+                <text>
+                  <textPath href="#pm-top" startOffset="50%" text-anchor="middle">
+                    PHOTO PIGEON
+                  </textPath>
+                </text>
+                <text>
+                  <textPath
+                    href="#pm-bottom"
+                    startOffset="50%"
+                    text-anchor="middle"
+                    data-i18n="setup.postmark.delivered"
+                  >
+                    DELIVERED
+                  </textPath>
+                </text>
+                <text
+                  class="postmark__date"
+                  id="postmark-date"
+                  x="100"
+                  y="106"
+                  text-anchor="middle"
+                ></text>
+              </svg>
+            </div>
+            <p class="delivery__line" id="done-line" data-i18n="setup.done.line">
+              Photo Pigeon is set up and signed in.
+            </p>
+          </div>
+
+          <p id="done-text" class="quiet" data-i18n="setup.done.text">
+            Anything already in your watched folders goes on the first pass.
+            The pigeon lives in the notification area.
+          </p>
+
+          <div class="actions">
+            <button type="button" class="primary" id="finish" data-i18n="setup.finish">
+              Finish
+            </button>
+          </div>
+
+          <p class="honesty">
+            Uploads are original quality and count against your Google storage.
+            Storage Saver does not apply.
+          </p>
+
+          <!--
+            Scary moment three, and it is the one that turns a working install
+            into a support ticket. TRAY-DESIGN section 3: Windows 11 hides new
+            tray icons in the overflow flyout, and a user who sees no pigeon
+            concludes it did not work.
+
+            The drawing is what ships. A screenshot of somebody else's product
+            would be a small forgery and would go stale the day they redesign.
+          -->
+          <div class="section scare">
+            <h2 data-i18n="setup.overflow.heading">Where the pigeon went</h2>
+            <p class="scare__line" data-i18n="setup.overflow.line">
+              Windows 11 tucks new tray icons into the hidden flyout, so click
+              the small arrow at the left of the clock and drag the pigeon down
+              onto the bar to keep it in sight.
+            </p>
+            <figure class="frame">
+              <svg
+                viewBox="0 0 320 190"
+                role="img"
+                aria-label="Diagram of the Windows 11 tray overflow: open the arrow, then drag the pigeon onto the taskbar"
+                data-i18n-attr="aria-label:setup.overflow.diagram"
+              >
+                <text class="dg-text" x="22" y="40">hidden icons</text>
+                <rect class="dg-line" x="22" y="50" width="120" height="50" rx="6" />
+                <rect class="dg-hit" x="36" y="66" width="18" height="18" rx="3" />
+                <rect class="dg-fill" x="64" y="66" width="18" height="18" rx="3" />
+                <rect class="dg-fill" x="92" y="66" width="18" height="18" rx="3" />
+
+                <rect class="dg-line" x="10" y="146" width="300" height="34" rx="5" />
+                <path class="dg-hit" d="M 34,168 l 8,-9 l 8,9" />
+                <rect class="dg-fill" x="196" y="158" width="18" height="12" rx="2" />
+                <rect class="dg-fill" x="224" y="158" width="18" height="12" rx="2" />
+                <rect class="dg-fill" x="262" y="159" width="34" height="10" rx="2" />
+
+                <path
+                  class="dg-hit"
+                  stroke-dasharray="5 5"
+                  d="M 45,104 C 72,132 118,130 146,150"
+                />
+                <path class="dg-hit-fill" d="M 152,154 l -13,-1 l 3,-8 z" />
+                <text class="dg-text-hit" x="172" y="128">drag it out</text>
+              </svg>
+              <figcaption data-i18n="setup.diagram.windows">
+                A diagram, not a screenshot of Windows.
+              </figcaption>
+            </figure>
+          </div>
+        </section>
+
+        <!-- ------------------------------------------------------ trouble -->
+        <!--
+          An error explains the fix and does not apologise. The text comes from
+          the core or from the shell; this is the frame it lands in.
+        -->
+        <section class="attention hidden" id="trouble">
+          <h2 data-i18n="common.needsLooking">This needs looking at</h2>
+          <p id="trouble-text"></p>
+        </section>
+      </div>
+    </main>
+    <!-- The language scaffold first: setup.js takes t() off it. -->
+    <script src="i18n.js"></script>
+    <script src="setup.js"></script>
+  </body>
+</html>

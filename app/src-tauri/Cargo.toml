@@ -1,0 +1,224 @@
+# Conf notes live here on purpose.
+#
+# tauri.conf.json cannot carry them: its `Config` struct is
+# `#[serde(deny_unknown_fields)]`, so any extra key (`_comment`, `//`, anything)
+# is a hard parse error rather than a note. Two settings in that file must not
+# be edited casually, so the reasons are written where a comment is legal:
+#
+#   productName = "Photo Pigeon"
+#     The display name, a project decision: humans read Photo Pigeon,
+#     machines keep photo-pigeon. This one string is three facts at once and all
+#     three follow it automatically, which is why it is not written down
+#     anywhere else:
+#       the Start Menu shortcut          $SMPROGRAMS\${PRODUCTNAME}.lnk
+#       the install directory            $LOCALAPPDATA\${PRODUCTNAME}
+#       the HKCU Run value name          the uninstaller deletes ${PRODUCTNAME}
+#     All three read out of the generated installer.nsi, not assumed. The Rust
+#     side reads it back as package_info().name and state.rs asserts the two
+#     agree, so productName and DISPLAY_NAME cannot drift apart.
+#
+#     One consequence worth knowing before installing this build: the install
+#     directory moves from %LOCALAPPDATA%\photo-pigeon to
+#     %LOCALAPPDATA%\Photo Pigeon, and NSIS keys its uninstall entry on
+#     productName too, so an older install is a different product to the
+#     installer and is neither upgraded nor removed. Uninstall the old one
+#     first. Nothing in ~/.photo-pigeon is touched either way.
+#
+#   mainBinaryName = "photo-pigeon"
+#     FROZEN. A machine identifier: the exe name, and therefore what Task
+#     Manager shows and what the Run value's data points at. It does not follow
+#     productName and it must not.
+#
+#   identifier = "io.github.justerlex.photopigeon"
+#     FROZEN. It is also the AppUserModelID, and
+#     M0 read it back off the installed Start Menu shortcut. Every Windows toast
+#     is filed under it, so changing it silently unnames every notification the
+#     app has ever sent and orphans the installed app's identity.
+#
+#   version = "../../package.json"
+#     Tauri's supported form for "read the number from that manifest". The path
+#     resolves to the repo root, not to app/package.json, which was proved at M0
+#     by setting app/package.json to 9.9.9 and watching the bundler still emit
+#     photo-pigeon_0.1.0_x64-setup.exe.
+#
+#   app.windows = []  AND  app.withGlobalTauri = true
+#     Still no declared window at M4, and that is the memory law rather than an
+#     oversight: a declared window is created at startup and lives forever, and
+#     M0 measured one static page at 306.70 MB across seven processes against
+#     9.87 MB for the shell alone. src/windows.rs creates the two pages on
+#     demand and destroys them on close.
+#
+#     withGlobalTauri exposes window.__TAURI__ to the two pages so they can call
+#     invoke and listen without a bundler in this repo. It is not a widening of
+#     what a page may do: the page can still only reach the eight commands in
+#     src/ipc.rs and the two permissions in capabilities/default.json, and every
+#     plugin command stays ungranted.
+#
+#   plugins.updater.pubkey
+#     The release public key, minisign id B2FD12B5938FBBB2. Its private half
+#     lives in the maintainer's password manager and in the repository's
+#     signing secrets, never in the tree. An installed copy can only ever be
+#     updated by a build signed with that private half, so losing it strands
+#     every user on the version they have, for ever, with no recovery but a
+#     fresh installer downloaded by hand.
+#
+#     It is not Authenticode. This signature says an update came from us and does
+#     nothing whatever for SmartScreen. Two signatures, two entirely different
+#     problems.
+#
+#   plugins.updater.endpoints
+#     The static URL of TRAY-DESIGN section 5, which works because job 3 of the
+#     release pipeline uploads latest.json to the same Release as the installer.
+#     It supports {{current_version}}, {{target}} and {{arch}} if it ever needs to
+#     become dynamic. It does not need to yet.
+#
+#     Note for anybody watching a dev session's log: the repository is private
+#     until it is published, so this URL 404s and the check fails with a
+#     line in the shell log. That is the wiring working. Set
+#     PHOTO_PIGEON_UPDATE_CHECK=off to stop it going out at all.
+#
+#   plugins.updater.windows.installMode = "passive"
+#     A progress bar, no wizard, no clicks. It is also the plugin's own default
+#     and is written out anyway, because section 5 names it and a default that
+#     changes upstream would change this product's install experience silently.
+#
+#   bundle.createUpdaterArtifacts = true
+#     Makes the bundler emit the update payload and its signature beside the
+#     installer, which is what CI attaches to the Release and what the endpoint's
+#     latest.json points at. Without it there is a Release with an installer and
+#     no way for an installed copy to ever move.
+#
+#   bundle.externalBin and bundle.resources
+#     Copied word for word out of app/scripts/sidecar-layout.json, which is the
+#     contract between the staging script and the shell and says so in its own
+#     $comment. Change them there first, never here first. Both directories are
+#     generated and gitignored, so a fresh clone must run the staging script
+#     before cargo can build at all. That is by design, TRAY-DESIGN section 5.
+
+[package]
+name = "photo-pigeon-tray"
+
+# Lockstep with the repo root package.json: one
+# version, one tag, one number. That file is the only place the number is
+# written by hand. build.rs fails the build when this line disagrees with it,
+# so the number that used to drift in silence now cannot.
+version = "0.1.0"
+
+description = "photo-pigeon tray shell"
+authors = ["justerlex"]
+edition = "2021"
+rust-version = "1.77.2"
+
+[lib]
+name = "photo_pigeon_tray_lib"
+crate-type = ["staticlib", "cdylib", "rlib"]
+
+# The shipped executable is photo-pigeon.exe, by project decision.
+# That name is what Task Manager, the HKCU Run value's data and the Start Menu
+# shortcut target all show, so it is the name a user meets.
+#
+# Two mechanisms, deliberately, because each covers a half the other misses:
+#
+#   this [[bin]] target renames what cargo itself produces, so `tauri dev` and a
+#   bare `cargo build` also yield photo-pigeon.exe. Without it those two paths
+#   keep the crate name and a dev-session Run key would record a path that no
+#   installed build ever has.
+#
+#   mainBinaryName in tauri.conf.json is Tauri's own stated mechanism and is
+#   what feeds ${MAINBINARYNAME} to the NSIS template. Tauri applies it during
+#   `tauri build` only, which is why it is not sufficient on its own.
+#
+# The crate keeps its -tray suffix: it names the Rust package, not the product,
+# and the distinction is worth keeping in Cargo.lock.
+[[bin]]
+name = "photo-pigeon"
+path = "src/main.rs"
+
+[build-dependencies]
+tauri-build = { version = "2.6", features = [] }
+# Already compiled as part of the tauri-build tree, so the version check in
+# build.rs costs no extra build time.
+serde_json = "1"
+
+[dependencies]
+tauri = { version = "2.11", features = ["tray-icon", "image-png"] }
+# No tauri-plugin-shell, deliberately. TRAY-DESIGN sections 0 and 2 assumed the
+# sidecar would be spawned through it, but src/supervisor.rs spawns the resolved
+# path with std::process::Command instead, which is what the bare-line stdin
+# protocol wants anyway. Leaving the plugin out is the stronger version of the
+# same law section 0 states: a plugin that is not compiled in cannot be reached,
+# so there is no shell:allow-execute to scope and no way for a webview to spawn
+# anything, however the capabilities file is later edited.
+# No tauri-plugin-autostart either, and this one is a correctness call rather
+# than a security one. The plugin cannot write a quoted HKCU Run value and no
+# published version can: 2.5.1 computes the path itself inside its own `setup`
+# and exposes nothing that influences it, while auto-launch underneath writes
+# `format!("{app_path} {args}")`, unquoted, in both 0.5.0 and the current 0.6.0.
+# Unquoted breaks for any install path containing a space, which after the
+# productName change to "Photo Pigeon" means %LOCALAPPDATA%\Photo Pigeon, which
+# means every machine. That is option A of the blocker note at the end of
+# TRAY-DESIGN section 6's M3, and src/autostart.rs carries the whole read.
+#
+# Pinned to 0.5 and never 0.6: 0.6 adds a WindowsEnableMode whose default
+# (Dynamic) tries HKEY_LOCAL_MACHINE first and falls back to the user hive on
+# access denied, which is the opposite of this project's no-elevation rule.
+# Nothing new is fetched: 0.5.0 was already in Cargo.lock as the plugin's own
+# dependency, so this swap removes a crate rather than adding one.
+auto-launch = "0.5"
+tauri-plugin-notification = "2.3"
+tauri-plugin-opener = "2.5"
+# M4, and the first dependency added since M2. The first-run window needs a
+# native folder picker: TRAY-DESIGN's synthesis puts it in the minimum bar to be
+# the obvious answer, and a person who never opens a terminal should not have to
+# type a path. There is no way to draw one from a webview that is not a file
+# input, and a file input is exactly the file system access section 0 forbids.
+#
+# Its IPC permissions stay ungranted, deliberately, and that is the whole reason
+# this is safe: capabilities/default.json grants no `dialog:*`, so a page cannot
+# call the plugin. It calls `ipc::pick_folder`, which takes no arguments, opens
+# one dialog, and hands back a string. The plugin is reachable from Rust and
+# from nowhere else, which is the same shape every other privileged thing in
+# this app has.
+tauri-plugin-dialog = "2.4"
+# The core's NDJSON stream, and app/scripts/sidecar-layout.json, which the shell
+# reads with include_str! rather than restating any of its path literals.
+serde = { version = "1", features = ["derive"] }
+serde_json = "1"
+# M5, and TRAY-DESIGN section 5 names this crate by name: the mechanism is
+# tauri-plugin-updater and not electron-updater, which is the correction that
+# motivated the whole revision of that section.
+#
+# Default features, which are rustls-tls and zip, and both are deliberate.
+# rustls is the plugin's own default and the path the ecosystem tests; swapping
+# to native-tls to borrow Windows' own SChannel would trade a tested path for a
+# smaller binary, which is the wrong way round on the one code path that replaces
+# the app. zip is the extractor for the v1-compatible artifact shape: this
+# project emits the bare -setup.exe, so it is not on the live path today, and
+# turning it off would make the artifact shape a build-breaking decision rather
+# than a config key.
+#
+# Its four IPC commands are granted to nothing. See capabilities/default.json,
+# and note that `install` is the one command in this application that replaces
+# the running process.
+tauri-plugin-updater = "2.10"
+
+[target.'cfg(windows)'.dependencies]
+# Win32_UI_Shell    SetCurrentProcessExplicitAppUserModelID, so toasts are ours
+# Win32_System_Registry  reading the Run value back after writing it, which is
+#                   the only runtime evidence that the quoting fix is in force.
+#                   auto-launch has no reader, so this is the one place the
+#                   shell talks to the registry itself. One feature flag rather
+#                   than a second registry crate.
+windows-sys = { version = "0.61", features = [
+  "Win32_UI_Shell",
+  "Win32_Foundation",
+  "Win32_System_Registry",
+] }
+
+# Matches the create-tauri-app default: small binary, no debug symbols.
+[profile.release]
+opt-level = "s"
+lto = true
+codegen-units = 1
+panic = "abort"
+strip = true

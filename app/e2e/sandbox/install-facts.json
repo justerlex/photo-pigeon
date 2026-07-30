@@ -1,0 +1,25 @@
+{
+  "displayName": "Photo Pigeon",
+  "exeName": "photo-pigeon.exe",
+  "npmName": "photo-pigeon",
+  "identifier": "io.github.justerlex.photopigeon",
+  "sidecarExe": "pigeon-core.exe",
+  "resources": [
+    "resources/core.mjs",
+    "resources/NODE-LICENSE.txt",
+    "resources/core-manifest.json"
+  ],
+  "runValueName": "Photo Pigeon",
+  "bootFlag": "--autostart",
+  "stateDirName": ".photo-pigeon",
+  "version": "0.1.0",
+  "installedLayout": "%LOCALAPPDATA%/Photo Pigeon/{photo-pigeon.exe, pigeon-core.exe, resources/core.mjs}",
+  "installerFileName": "Photo Pigeon_0.1.0_x64-setup.exe",
+  "readAt": "2026-07-30T16:27:00.2751700+03:00",
+  "readFrom": [
+    "D:\\Dev\\photo-pigeon\\app\\src-tauri\\tauri.conf.json",
+    "D:\\Dev\\photo-pigeon\\app\\scripts\\sidecar-layout.json",
+    "D:\\Dev\\photo-pigeon\\package.json",
+    "D:\\Dev\\photo-pigeon\\src\\wizard\\paths.ts"
+  ]
+}

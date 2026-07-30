@@ -1,0 +1,34 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>Photo Pigeon</title>
+    <!--
+      This page is not shown, and nothing in the shell can open it.
+
+      It exists because tauri.conf.json declares `build.frontendDist` and the
+      bundler needs that directory to hold an entry point. The app declares zero
+      windows and creates none until somebody clicks a menu item: TRAY-DESIGN
+      section 1 makes "no window at idle" a memory law, after M0 measured one
+      static page costing 306 MB across seven processes against 9.87 MB for the
+      shell with nothing open.
+
+      The three real pages are setup.html, status.html and health.html. Each is
+      created on demand and destroyed on close, never hidden.
+    -->
+    <link rel="stylesheet" href="pigeon.css" />
+  </head>
+  <body>
+    <main class="page page--plain">
+      <div class="column">
+        <p class="eyebrow">Photo Pigeon</p>
+        <h1>The pigeon lives in the tray</h1>
+        <p class="quiet">
+          This page opens no windows. Right click the pigeon in the notification
+          area to see what it is doing.
+        </p>
+      </div>
+    </main>
+  </body>
+</html>

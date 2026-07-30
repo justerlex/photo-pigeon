@@ -1,0 +1,21 @@
+{
+  "name": "photo-pigeon-app",
+  "private": true,
+  "//": "No version field, on purpose. Lockstep versioning: the repo root package.json holds the one number written by hand. tauri.conf.json reads it as \"../../package.json\", and app/src-tauri/build.rs fails the build when Cargo.toml disagrees with it. This package is private and never published, so a version here would only be a fourth number able to lie, which it already did once: M0 set it to 9.9.9 and the bundler still emitted photo-pigeon_0.1.0_x64-setup.exe.",
+  "description": "Tauri 2 tray shell for photo-pigeon. Nothing here reaches npm: the published package is the repo root, whose files field is dist, README.md and LICENSE.",
+  "type": "module",
+  "scripts": {
+    "//predev": "predev and prebuild stage the sidecar before anything can read it, so npm run dev and npm run build can never ship yesterday's core. CI job 3 calls tauri-action directly rather than through npm, so it must run node scripts/build-sidecar.mjs as its own step.",
+    "predev": "node scripts/build-sidecar.mjs",
+    "dev": "tauri dev",
+    "prebuild": "node scripts/build-sidecar.mjs",
+    "build": "tauri build",
+    "sidecar": "node scripts/build-sidecar.mjs",
+    "sidecar:smoke": "node scripts/smoke-sidecar.mjs",
+    "tauri": "tauri"
+  },
+  "devDependencies": {
+    "@tauri-apps/cli": "2.11.4",
+    "esbuild": "0.28.1"
+  }
+}

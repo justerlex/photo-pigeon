@@ -1,0 +1,8 @@
+node_modules/
+src-tauri/target/
+src-tauri/gen/
+
+# Staged by scripts/build-sidecar.mjs, in full, on every build.
+# binaries/ holds an 85 MB copy of node.exe. Never commit either directory.
+src-tauri/binaries/
+src-tauri/resources/

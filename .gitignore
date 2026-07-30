@@ -1,0 +1,57 @@
+node_modules/
+dist/
+*.log
+probe-results.json
+
+# What scripts/make-latest-json.mjs stages for a release: the installer, its
+# signature and latest.json. Generated in full on every run, emptied first, and
+# the installer alone is 23 MB.
+release-assets/
+.env
+.env.*
+!.env.example
+
+# local runtime state, never commit credentials or tokens
+credentials.json
+client_secret*.json
+token.json
+ledger.json
+ledger.jsonl
+setup.json
+.photo-pigeon/
+# these sit beside the ledger and the token, so a config pointed at a checkout
+# would drop them here. sessions.json can hold a live upload session URL.
+sessions.json
+quota.json
+albums.json
+
+# updater signing keys. THE PRIVATE HALF NEVER GOES IN THIS REPOSITORY, not the
+# throwaway one a lane generates for wiring and not the real one the owner keeps
+# in his vault. Only the public key is committed, and it lives in
+# app/src-tauri/tauri.conf.json under plugins.updater.pubkey where a shipped
+# build can be checked against it. TRAY-DESIGN section 5: an installed copy can
+# only ever be updated by a build signed with the real key, so it lives offline
+# in a password manager and its two CI secrets are set from there.
+.updater-throwaway/
+*.key
+# and the public half too, wherever a key file lands. The public key belongs in
+# tauri.conf.json as a string and nowhere else as a file, so a .pub in the tree
+# is always the sibling of a private key that should not be here either. It is
+# the .pub that makes `git status` say something, and a directory that says
+# nothing is a directory nobody looks in.
+*.key.pub
+# the shell-expansion trap, which happened on 30 July 2026 during M5
+# integration: `signer generate -w %USERPROFILE%\...` run in a shell that does
+# not expand %USERPROFILE% makes a literal directory of that name, relative to
+# wherever it was run, and it was run from app/. A real minisign keypair was
+# sitting at app/%USERPROFILE%/.tauri/ and only the .pub half showed up in
+# `git status`. RELEASE.md step 1 says use $HOME; this is the net under it.
+%USERPROFILE%/
+**/%USERPROFILE%/
+
+# editor and OS noise
+.DS_Store
+Thumbs.db
+.vscode/
+.idea/
+probe-results.json

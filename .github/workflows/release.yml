@@ -1,0 +1,328 @@
+# The launch road. A v tag builds the installer and puts it in a DRAFT release.
+#
+# Two roads in one file, because they are two halves of one release and the second
+# one must not fire until a person has looked at the first:
+#
+#   push a v* tag        build everything, assemble latest.json, create a draft
+#   publish that release  npm publish, from the same tag
+#
+# TRAY-DESIGN section 5 sketches three jobs and puts npm publish on the tag. This
+# moves it onto the click instead, and the reason is that the two halves are not
+# equally reversible. A draft release is invisible and deletable. An npm publish
+# is a public version number with a 72 hour window and a name that can never be
+# reused. The publish gate says publishing is a human click, so the click
+# that publishes the Release is the click that publishes the package. If that is
+# overruled, the change is one `if` and one trigger.
+#
+# What the tag road needs before it can work, both of them the maintainer's:
+#
+#   TAURI_SIGNING_PRIVATE_KEY           the minisign private key from
+#                                       `tauri signer generate`, whole file contents
+#   TAURI_SIGNING_PRIVATE_KEY_PASSWORD  its passphrase
+#
+# Those sign the update payload, not the installer. This is minisign and not
+# Authenticode: it proves an update came from us and it does nothing whatsoever
+# for SmartScreen. Losing the key strands every installed copy on the version it
+# has, forever, with no recovery but a fresh installer downloaded by hand, so it
+# is backed up offline before the first release and not after. TRAY-DESIGN section
+# 5, and rows 1 to 3 of the M5 plan.
+#
+# NPM_TOKEN, for the second road, is a granular automation token: the account uses
+# passkey 2FA, so CI cannot log in as a human. Without it the npm job says so and
+# publishes nothing, which is the right behaviour for a launch whose npm half may
+# come a day later.
+#
+# The e2e rig in app/e2e is not here, on purpose: it is PowerShell that launches
+# real trays and waits on a tray icon, an HKCU Run value and a pair of eyes, and a
+# hosted runner has no desktop session to put a tray in. Section 1 of the M5 pass
+# in app/e2e/CHECKLIST.md is the pre-publish must, and it is walked by a person.
+name: release
+
+on:
+  push:
+    tags: ['v*']
+  release:
+    types: [published]
+
+permissions:
+  contents: read
+
+env:
+  # The pin, for the reason spelled out in ci.yml: build-sidecar.mjs stages the
+  # interpreter that runs it and refuses anything but this version.
+  PIGEON_NODE: '22.18.0'
+
+jobs:
+  installer:
+    name: the installer, and the draft it lands in
+    if: github.event_name == 'push'
+    runs-on: windows-latest
+    timeout-minutes: 90
+    permissions:
+      # Only this job writes, and all it writes is a draft release.
+      contents: write
+
+    steps:
+      - uses: actions/checkout@v4
+
+      # First, and before anything expensive. Without both of these the bundler
+      # emits an installer and no .sig, the assemble step 20 minutes later has
+      # nothing to put in latest.json, and the fix is a one line config change or
+      # a secret. Updates are on by default in this product, so a release nobody
+      # can update is not a release this workflow is willing to build.
+      - name: refuse to build a release nobody could update
+        env:
+          HAS_SIGNING_KEY: ${{ secrets.TAURI_SIGNING_PRIVATE_KEY != '' }}
+        shell: pwsh
+        run: |
+          $conf = Get-Content app/src-tauri/tauri.conf.json -Raw | ConvertFrom-Json
+          if ($conf.bundle.createUpdaterArtifacts -ne $true) {
+            Write-Host 'bundle.createUpdaterArtifacts is not true in app/src-tauri/tauri.conf.json.'
+            Write-Host 'Without it the bundler writes an installer and no signature, so latest.json cannot be assembled.'
+            exit 1
+          }
+          if ($env:HAS_SIGNING_KEY -ne 'true') {
+            Write-Host 'TAURI_SIGNING_PRIVATE_KEY is not set for this repository.'
+            Write-Host 'It is the minisign key from tauri signer generate, and only the maintainer has it.'
+            Write-Host 'See .github/workflows/README.md for what it is and what losing it costs.'
+            exit 1
+          }
+
+      # And WHICH key, which the check above deliberately cannot ask: a secret is
+      # set or it is not, and GitHub will not show a workflow what is in it.
+      #
+      # This closes the one state on this road where every other gate stays green
+      # while the release is already broken. The maintainer sets both signing secrets,
+      # step 3 of docs/RELEASE.md, and step 2's swap of the public key is
+      # forgotten or half done. Then: the preflight above passes, the version
+      # lockstep passes, and `cargo test` passes, because the shell suite's
+      # the_pubkey_in_the_shipped_config_is_still_the_throwaway asserts the
+      # throwaway is STILL there and is green in exactly this case. tauri-action
+      # signs with the real private key, make-latest-json.mjs finds a .sig and
+      # writes a manifest, and the draft release looks perfect.
+      #
+      # What shipped is a copy that trusts a key nobody signs with. Every daily
+      # check after it downloads an update and fails verification, and a failed
+      # check is one log line with no toast and no attention state, by design. So
+      # it is silent, it is permanent, and the only recovery is asking every user
+      # to download an installer by hand.
+      #
+      # Tag only. In ci.yml this would fail every push on every branch until the
+      # swap is done, and a gate that fails constantly is a gate somebody deletes.
+      #
+      # The id stays in this file after the swap. It is a denylist of one dead
+      # keypair, and the minisign-shape check beside it is the half of the shell
+      # test that outlives step 2, so the runbook can go on saying "delete that
+      # test" without the tag road losing anything.
+      - name: refuse to ship the throwaway updater key
+        shell: pwsh
+        run: |
+          $conf = Get-Content app/src-tauri/tauri.conf.json -Raw | ConvertFrom-Json
+          $pubkey = [Text.Encoding]::UTF8.GetString([Convert]::FromBase64String($conf.plugins.updater.pubkey))
+          if ($pubkey -notmatch 'minisign public key') {
+            Write-Host 'plugins.updater.pubkey in app/src-tauri/tauri.conf.json is not a minisign public key.'
+            Write-Host 'The plugin cannot verify anything with it, so no update this release ever offers can install.'
+            exit 1
+          }
+          if ($pubkey -match 'E17F8D75CFB8611F') {
+            Write-Host 'plugins.updater.pubkey in app/src-tauri/tauri.conf.json is still the M5 throwaway key.'
+            Write-Host 'This tag would sign with the real key and ship a copy that trusts the fake one, so every'
+            Write-Host 'update after it would fail verification on every machine, silently and permanently.'
+            Write-Host 'Step 2 of docs/RELEASE.md is the swap. Do it, delete this tag, and tag again.'
+            exit 1
+          }
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: ${{ env.PIGEON_NODE }}
+          cache: npm
+          cache-dependency-path: |
+            package-lock.json
+            app/package-lock.json
+
+      - name: install the core's dependencies
+        run: npm ci
+
+      # The tag joins the lockstep here, and this is the check M5 added. A v0.1.0
+      # tag against a manifest reading 0.1.1 is a release whose installer, npm
+      # package and Release page all disagree with the git history, so the whole
+      # tag fails rather than three quarters of a release shipping.
+      #
+      # --github-output hands the version forward, so nothing downstream parses
+      # package.json with a second reader.
+      - name: version lockstep, the tag included
+        id: version
+        run: node scripts/check-versions.mjs --tag "${{ github.ref_name }}" --github-output
+
+      - name: the core suite
+        run: npm test
+
+      - name: install the shell's build dependencies
+        run: npm ci
+        working-directory: app
+
+      - uses: dtolnay/rust-toolchain@stable
+
+      - uses: Swatinem/rust-cache@v2
+        with:
+          workspaces: app/src-tauri
+
+      # BEFORE anything Rust, and before the bundler. tauri.conf.json names
+      # binaries/ and resources/, both are gitignored, and a fresh clone has
+      # neither. tauri-action is called directly rather than through the npm
+      # scripts that carry the prebuild hook, so this step is the staging.
+      - name: stage the sidecar and the core bundle
+        run: node app/scripts/build-sidecar.mjs
+
+      # Not optional here. The shell's suite holds the layout contract, the icon
+      # states and the state machine invariants: the things that would ship broken
+      # and silent.
+      - name: the shell suite
+        run: cargo test
+        working-directory: app/src-tauri
+
+      # Row 13 of the M5 plan, and it is not theoretical on a runner. On 29 July
+      # 2026 this directory held two near-identical installers, one from before
+      # the productName rename and one from after, which is how the wrong file
+      # gets attached to a Release. A hosted runner starts empty, but rust-cache
+      # restores a target directory, so the sweep happens here rather than being
+      # assumed. Anything found in the directory afterwards is the build just made,
+      # and make-latest-json.mjs refuses a second installer for the same reason.
+      - name: clear the bundle directory before the build
+        shell: pwsh
+        run: |
+          $bundle = 'app/src-tauri/target/release/bundle'
+          if (Test-Path $bundle) { Remove-Item -Recurse -Force $bundle }
+
+      # tauri-action builds and nothing more. Its release-creating inputs
+      # (tagName, releaseDraft, includeUpdaterJson) are deliberately unused: the
+      # manifest is assembled by a script with tests over it, and the release is
+      # created by an explicit command so that "draft" is visible in the file
+      # rather than buried in an action's defaults. No GITHUB_TOKEN is given to
+      # this step, so it cannot create a release even by accident.
+      #
+      # The two signing variables are what turn bundle.createUpdaterArtifacts into
+      # a signed update payload plus the .sig beside the installer.
+      - name: build the installer
+        uses: tauri-apps/tauri-action@v0
+        env:
+          TAURI_SIGNING_PRIVATE_KEY: ${{ secrets.TAURI_SIGNING_PRIVATE_KEY }}
+          TAURI_SIGNING_PRIVATE_KEY_PASSWORD: ${{ secrets.TAURI_SIGNING_PRIVATE_KEY_PASSWORD }}
+        with:
+          projectPath: app
+          args: --verbose
+
+      # Exactly one installer, its signature beside it, and a URL that matches the
+      # name GitHub will actually serve the asset under: productName has a space
+      # in it and GitHub turns whitespace into dots. See the header of the script.
+      - name: assemble latest.json and stage the assets
+        run: >-
+          node scripts/make-latest-json.mjs
+          --version ${{ steps.version.outputs.version }}
+          --tag ${{ github.ref_name }}
+          --repo ${{ github.repository }}
+          --out release-assets
+
+      # Before the release step, so a failure there still leaves the installer
+      # downloadable from the run instead of needing another 20 minute build.
+      - name: keep the assets on the run itself
+        uses: actions/upload-artifact@v4
+        with:
+          name: photo-pigeon-${{ github.ref_name }}
+          path: release-assets/*
+          if-no-files-found: error
+
+      # A DRAFT, and that is the whole point: publishing is a human click. The
+      # maintainer writes what changed into the page, walks section 1 of the M5
+      # checklist, and only then presses the button. Nothing in this repository
+      # undrafts a release.
+      #
+      # A re-run of the same tag fails here, because the draft already exists.
+      # That is the honest behaviour: delete the draft, then re-run.
+      - name: the draft release
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          VERSION: ${{ steps.version.outputs.version }}
+          TAG: ${{ github.ref_name }}
+        shell: pwsh
+        run: |
+          $assets = Get-ChildItem release-assets | ForEach-Object { $_.FullName }
+          gh release create $env:TAG --draft --verify-tag --title "Photo Pigeon $env:VERSION" --notes-file .github/release-notes.md @assets
+
+      - name: what is left for a person
+        env:
+          VERSION: ${{ steps.version.outputs.version }}
+          TAG: ${{ github.ref_name }}
+        shell: pwsh
+        run: |
+          $lines = @(
+            "### Photo Pigeon $env:VERSION is a draft",
+            '',
+            "The installer, its signature and latest.json are attached to the draft release for $env:TAG.",
+            'Nothing is public and nothing is on npm yet.',
+            '',
+            'Before pressing Publish:',
+            '',
+            '1. Walk section 1 of app/e2e/CHECKLIST.md on a machine that has never had this installed.',
+            '2. Put the real SmartScreen screenshot on the page, above the download link.',
+            '3. Check that latest.json names the asset URL GitHub actually serves.',
+            '',
+            'Publishing the release starts the npm half of this workflow.'
+          )
+          $lines -join "`n" | Out-File -FilePath $env:GITHUB_STEP_SUMMARY -Append -Encoding utf8
+
+  npm:
+    name: npm publish, on the click and not on the tag
+    if: github.event_name == 'release' && !github.event.release.prerelease
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    permissions:
+      contents: read
+      # Provenance is signed through the runner's OIDC identity, so the workflow
+      # needs a token of its own. Note that provenance also needs a PUBLIC
+      # repository: while github.com/justerlex/photo-pigeon is private, this flag
+      # fails the publish. The repository has to be public for the SignPath
+      # Foundation application anyway, so the order is public first, then publish.
+      id-token: write
+
+    env:
+      # secrets cannot be read in a job level `if`, so the gate is an env var and
+      # a step level one. Without a token this job explains itself and exits 0:
+      # the npm half of a launch is allowed to arrive a day late.
+      HAS_NPM_TOKEN: ${{ secrets.NPM_TOKEN != '' }}
+
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: ${{ github.event.release.tag_name }}
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: ${{ env.PIGEON_NODE }}
+          registry-url: https://registry.npmjs.org
+          cache: npm
+
+      - name: install the core's dependencies
+        run: npm ci
+
+      # The same three-way check, against the tag the release was cut from. The
+      # suites are not re-run here: this is the same commit the tag road already
+      # proved on Windows, and the core suite has never been claimed on Linux.
+      - name: version lockstep, the tag included
+        run: node scripts/check-versions.mjs --tag "${{ github.event.release.tag_name }}"
+
+      # prepublishOnly runs clean and tsc, so this publishes a freshly built dist
+      # and not whatever was lying around. files is dist, README.md and LICENSE,
+      # so nothing in app/ can reach the tarball.
+      - name: publish
+        if: env.HAS_NPM_TOKEN == 'true'
+        run: npm publish --provenance
+        env:
+          NODE_AUTH_TOKEN: ${{ secrets.NPM_TOKEN }}
+
+      - name: say plainly that nothing was published
+        if: env.HAS_NPM_TOKEN != 'true'
+        run: |
+          echo "NPM_TOKEN is not set, so nothing was published to npm."
+          echo "The account uses passkey 2FA, so this needs a granular automation token, which only the maintainer can mint."
+          echo "The GitHub release is unaffected."

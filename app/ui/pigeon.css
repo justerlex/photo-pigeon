@@ -1,0 +1,1250 @@
+/*
+ * Photo Pigeon, the window skin.
+ *
+ * Subject: a carrier pigeon that quietly brings photos home. The one job of
+ * these windows is to take somebody from nothing to a first delivery without
+ * fear, so the tone is calm postal competence and nothing here shouts except
+ * the one thing that is allowed to.
+ *
+ * THE ONE BOLD ELEMENT IS THE AIRMAIL EDGE.
+ * A par avion stripe, airmail red and postal navy on paper, runs down the left
+ * edge of the first run window as its progress rail and fills step by step.
+ * It is the only saturated area in the package. Everything else is paper, ink,
+ * hairlines and space. If a later pass wants to add emphasis somewhere, take it
+ * out of the rail first: two bold things is none.
+ *
+ * The rules the rest of the file keeps, written down so they can be broken on
+ * purpose rather than by accident:
+ *
+ *   · no gradients. The only gradient functions in this file are the airmail
+ *     stripes, and they are hard stops: flat bands, no blend, a printed pattern
+ *     rather than a wash.
+ *   · no nested cards. One level of surface, separated by hairline rules. A box
+ *     inside a box is how a settings page starts.
+ *   · headings are sparse. The slab is for the page title and the section
+ *     names, never for a value or a label.
+ *   · buttons say what they do. "Choose folder", not "Browse...".
+ *   · colour carries no information on its own. Every green, amber and red mark
+ *     sits next to a word that says the same thing.
+ *
+ * Both themes are real and both follow the system. The palette is stated once,
+ * in tokens, and the dark block below re-states every token rather than
+ * patching a few: a half overridden palette is the thing that goes wrong six
+ * months later when somebody adds a colour.
+ */
+
+/* ------------------------------------------------------------------ tokens */
+
+:root {
+  color-scheme: light dark;
+
+  /* The named palette. These five plus paper are the whole vocabulary. */
+  --paper: #fafaf7;
+  --ink: #22272e;
+  --navy: #1f3a5f;
+  --red: #c6382e;
+  --grey: #8a8f98;
+  --sky: #d8e6f2;
+
+  /* Derived, and derived is all they are. Nothing new is invented here. */
+  --ink-soft: #4a515b;
+  --sunk: #f1f1ec;
+  --rule: rgba(138, 143, 152, 0.34);
+  --rule-strong: rgba(138, 143, 152, 0.6);
+
+  /* Marks. Small, and always beside a word. */
+  --mark-ok: #2e7d57;
+  --mark-warn: #a96a05;
+  --mark-bad: var(--red);
+
+  /* Type. Headings are the bundled slab; body is the system's own text face,
+     which on Windows 11 is a variable Segoe and is better than anything we
+     could ship. Paths and ids are Cascadia, which is on every Windows 11 and
+     falls back to Consolas, which is on every Windows. */
+  --slab: "Bitter", "Segoe UI Variable Display", Georgia, "Times New Roman", serif;
+  --text: "Segoe UI Variable Text", "Segoe UI", system-ui, -apple-system, sans-serif;
+  --mono: "Cascadia Mono", Consolas, ui-monospace, "Courier New", monospace;
+
+  /* Spacing. A four step scale, used everywhere, so rhythm is a choice made
+     once rather than a number typed per rule. */
+  --s1: 6px;
+  --s2: 12px;
+  --s3: 20px;
+  --s4: 32px;
+  --s5: 52px;
+
+  /* The rail. Its width is a layout constant, so it is a token. */
+  --rail: 30px;
+
+  --focus: var(--navy);
+}
+
+@media (prefers-color-scheme: dark) {
+  :root {
+    --paper: #1c1f26;
+    --ink: #e8eaed;
+    /* Navy lifts and red lifts, because a 4.5:1 navy on slate is not the same
+       ink as a navy on paper. The airmail stripe is the same stripe, printed
+       on a darker envelope. */
+    --navy: #7fa3d0;
+    --red: #d4544a;
+    --grey: #8a8f98;
+    --sky: #22303f;
+
+    --ink-soft: #a8aeb8;
+    --sunk: #23272f;
+    --rule: rgba(138, 143, 152, 0.28);
+    --rule-strong: rgba(138, 143, 152, 0.5);
+
+    --mark-ok: #6fbf97;
+    --mark-warn: #e0a340;
+
+    --focus: #9dc0e8;
+  }
+}
+
+/* The same two blocks again as an explicit override, so a future settings
+   toggle can stamp data-theme on the root and win in both directions. Nothing
+   in this build writes it; it costs two selectors to leave the door open. */
+:root[data-theme="light"] {
+  --paper: #fafaf7;
+  --ink: #22272e;
+  --navy: #1f3a5f;
+  --red: #c6382e;
+  --grey: #8a8f98;
+  --sky: #d8e6f2;
+  --ink-soft: #4a515b;
+  --sunk: #f1f1ec;
+  --rule: rgba(138, 143, 152, 0.34);
+  --rule-strong: rgba(138, 143, 152, 0.6);
+  --mark-ok: #2e7d57;
+  --mark-warn: #a96a05;
+  --focus: var(--navy);
+}
+
+:root[data-theme="dark"] {
+  --paper: #1c1f26;
+  --ink: #e8eaed;
+  --navy: #7fa3d0;
+  --red: #d4544a;
+  --grey: #8a8f98;
+  --sky: #22303f;
+  --ink-soft: #a8aeb8;
+  --sunk: #23272f;
+  --rule: rgba(138, 143, 152, 0.28);
+  --rule-strong: rgba(138, 143, 152, 0.5);
+  --mark-ok: #6fbf97;
+  --mark-warn: #e0a340;
+  --focus: #9dc0e8;
+}
+
+/* ------------------------------------------------------------------- fonts */
+
+/*
+ * Bundled, local, and the only two files. Bitter is SIL Open Font License,
+ * the licence ships beside it at fonts/OFL.txt, and no page in this app ever
+ * asks the network for anything: the CSP is default-src 'self' and there is no
+ * font-src to loosen.
+ */
+@font-face {
+  font-family: "Bitter";
+  src: url("fonts/bitter-latin-600.woff2") format("woff2");
+  font-weight: 600;
+  font-style: normal;
+  font-display: swap;
+}
+
+@font-face {
+  font-family: "Bitter";
+  src: url("fonts/bitter-latin-700.woff2") format("woff2");
+  font-weight: 700;
+  font-style: normal;
+  font-display: swap;
+}
+
+/* ------------------------------------------------------------------ ground */
+
+*,
+*::before,
+*::after {
+  box-sizing: border-box;
+}
+
+html,
+body {
+  height: 100%;
+}
+
+body {
+  margin: 0;
+  background: var(--paper);
+  color: var(--ink);
+  font: 14px/1.6 var(--text);
+  /* A window is chrome, not a document. Prose and paths opt back in below. */
+  -webkit-user-select: none;
+  user-select: none;
+  cursor: default;
+  overflow-x: hidden;
+}
+
+p,
+li,
+h1,
+h2,
+.selectable {
+  -webkit-user-select: text;
+  user-select: text;
+}
+
+/* Every focusable thing shows where it is. This is the quality floor and it is
+   not decorative: the whole first run walk is operable from the keyboard. */
+:focus-visible {
+  outline: 2px solid var(--focus);
+  outline-offset: 2px;
+  border-radius: 3px;
+}
+
+/* ----------------------------------------------------------------- layout */
+
+/*
+ * One column, left aligned, with the rail outside it. 620px is about 80
+ * characters of this face, which is where a paragraph stops being comfortable.
+ * The window minimum is 720 by 560; below that the padding gives way first and
+ * nothing reflows into a second shape.
+ */
+.page {
+  /* The only absolutely positioned child is the language control, which is
+     hidden while English is the only locale. */
+  position: relative;
+  min-height: 100%;
+  padding: var(--s4) var(--s4) var(--s5) calc(var(--rail) + var(--s4));
+}
+
+.page--plain {
+  padding-left: var(--s4);
+}
+
+.column {
+  max-width: 620px;
+}
+
+@media (max-width: 640px) {
+  .page {
+    padding-right: var(--s3);
+    padding-left: calc(var(--rail) + var(--s3));
+  }
+
+  .page--plain {
+    padding-left: var(--s3);
+  }
+}
+
+/* --------------------------------------------------- the airmail edge */
+
+/*
+ * The signature. A par avion stripe running the full height of the window at
+ * the left edge, filling from the top as the walk advances.
+ *
+ * How the fill works: the rail is a fixed strip, the fill is a child whose
+ * height is --progress, and --progress is set from JS as a percentage. The
+ * stripe pattern is painted on the fill at a fixed pitch, so the diagonal keeps
+ * its angle and the bands do not stretch as it grows. Below the fill the rail
+ * is bare paper, so the boundary reads as "how far along the envelope is".
+ *
+ * Two repeating gradients rather than one, because a par avion edge is red and
+ * navy bands with paper between them, and one gradient cannot lay two inks with
+ * a gap. Hard stops throughout: this is a printed pattern, not a blend.
+ */
+.rail {
+  position: fixed;
+  top: 0;
+  bottom: 0;
+  left: 0;
+  width: var(--rail);
+  border-right: 1px solid var(--rule);
+  background: var(--paper);
+  z-index: 2;
+}
+
+.rail__fill {
+  position: absolute;
+  top: 0;
+  right: 0;
+  left: 0;
+  height: var(--progress, 0%);
+  /*
+   * One 36px cycle carrying two inks: red for the first 9, paper, navy for
+   * 18 to 27, paper. The two layers share the cycle length on purpose. Give
+   * the red layer an 18px cycle instead and its second band lands exactly on
+   * the navy one and hides it completely, which is a stripe that looks right
+   * in the code and prints in one colour.
+   */
+  background-image:
+    repeating-linear-gradient(
+      45deg,
+      var(--red) 0,
+      var(--red) 9px,
+      transparent 9px,
+      transparent 36px
+    ),
+    repeating-linear-gradient(
+      45deg,
+      transparent 0,
+      transparent 18px,
+      var(--navy) 18px,
+      var(--navy) 27px,
+      transparent 27px,
+      transparent 36px
+    );
+  transition: height 640ms cubic-bezier(0.22, 0.68, 0.24, 1);
+}
+
+/* Where the ink stops. A hairline so the boundary is a crease, not an edge. */
+.rail__fill::after {
+  content: "";
+  position: absolute;
+  right: 0;
+  bottom: 0;
+  left: 0;
+  height: 1px;
+  background: var(--ink);
+  opacity: 0.25;
+}
+
+/*
+ * The everyday windows get the same edge, narrower and already full.
+ *
+ * It is not a second bold element: it is the same one, doing the other half of
+ * its job. In the wizard the stripe measures how far along the envelope is; in
+ * status and health there is nothing to measure, so the edge is simply inked
+ * and the window is a piece of airmail paper. Family resemblance for the price
+ * of one selector.
+ */
+.rail--static {
+  --rail: 12px;
+}
+
+.rail--static .rail__fill {
+  height: 100%;
+  transition: none;
+}
+
+.rail--static .rail__fill::after {
+  display: none;
+}
+
+/* Five notches, one per step, so the rail reads as a scale and not as a mood.
+   They sit under the fill and show through the paper part only. */
+.rail__notch {
+  position: absolute;
+  right: 5px;
+  left: 5px;
+  height: 1px;
+  background: var(--rule-strong);
+}
+
+/* ------------------------------------------------------------------- type */
+
+h1 {
+  margin: 0 0 var(--s2);
+  font: 600 25px/1.24 var(--slab);
+  letter-spacing: -0.005em;
+}
+
+h2 {
+  margin: 0 0 var(--s2);
+  font: 600 15px/1.4 var(--slab);
+}
+
+p {
+  margin: 0 0 var(--s2);
+}
+
+p:last-child {
+  margin-bottom: 0;
+}
+
+/* The eyebrow above a title: which step this is, or which window this is. */
+.eyebrow {
+  margin: 0 0 var(--s1);
+  font: 400 11px/1.4 var(--mono);
+  letter-spacing: 0.16em;
+  text-transform: uppercase;
+  color: var(--grey);
+}
+
+.lede {
+  margin: 0 0 var(--s3);
+  font-size: 15px;
+  color: var(--ink-soft);
+}
+
+.quiet {
+  color: var(--ink-soft);
+}
+
+.small {
+  font-size: 12.5px;
+  color: var(--ink-soft);
+}
+
+.path,
+code {
+  font: 12.5px/1.5 var(--mono);
+  word-break: break-all;
+}
+
+/* The storage law. It is the sentence this project is most tempted to bury, so
+   it gets a rule of its own above it and the sky wash behind it, and it is
+   never the smallest text on the screen. */
+.honesty {
+  margin: var(--s3) 0 0;
+  padding: var(--s2) var(--s3);
+  border-left: 3px solid var(--navy);
+  background: var(--sky);
+  color: var(--ink);
+  font-size: 13.5px;
+}
+
+/* ---------------------------------------------------------------- sections */
+
+/*
+ * A section is a heading, some content, and a hairline above it. That is the
+ * whole container vocabulary. Nothing is a card, nothing has a shadow, and
+ * nothing nests: the separation is done with space and one pixel.
+ */
+.section {
+  margin-top: var(--s4);
+  padding-top: var(--s3);
+  border-top: 1px solid var(--rule);
+}
+
+.section:first-of-type {
+  margin-top: var(--s3);
+}
+
+.row {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--s2);
+  align-items: center;
+}
+
+.actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--s2);
+  margin-top: var(--s3);
+}
+
+/* The headline row: the status sentence with the engine actions beside it.
+   The sentence is the flexible part and the buttons never shrink; they align
+   to the first line of a wrapped sentence rather than floating beside its
+   middle, which is what centering would do. */
+.headline {
+  display: flex;
+  align-items: flex-start;
+  gap: var(--s2);
+}
+
+.headline h1 {
+  flex: 1 1 auto;
+  min-width: 0;
+}
+
+.headline__actions {
+  flex: none;
+  display: flex;
+  gap: var(--s1);
+  /* Optical: the h1's line box is taller than a small button, so a nudge
+     seats the pair on the sentence's first line instead of above it. */
+  margin-top: 3px;
+}
+
+/* Sized like .row-actions buttons: several on a line, none of them primary. */
+.headline__actions button {
+  padding: 4px 10px;
+  font-size: 12.5px;
+}
+
+/* The log button rides the path line it opens, quieter than a row action. */
+.log-line button {
+  margin-left: var(--s1);
+  padding: 3px 9px;
+  font-size: 12px;
+}
+
+.hidden {
+  display: none !important;
+}
+
+/* ----------------------------------------------------------------- buttons */
+
+button {
+  padding: 8px 16px;
+  border: 1px solid var(--rule-strong);
+  border-radius: 4px;
+  background: transparent;
+  color: var(--ink);
+  font: 500 13.5px/1.2 var(--text);
+  cursor: pointer;
+  transition: border-color 120ms linear, background-color 120ms linear;
+}
+
+button:hover:not(:disabled) {
+  border-color: var(--ink-soft);
+  background: var(--sunk);
+}
+
+button:disabled {
+  opacity: 0.45;
+  cursor: default;
+}
+
+/* One primary per screen, and it is postal navy rather than airmail red:
+   red belongs to the rail and to things that are wrong. */
+button.primary {
+  border-color: var(--navy);
+  background: var(--navy);
+  color: var(--paper);
+}
+
+@media (prefers-color-scheme: dark) {
+  button.primary {
+    color: #12161c;
+  }
+}
+
+:root[data-theme="dark"] button.primary {
+  color: #12161c;
+}
+
+button.primary:hover:not(:disabled) {
+  background: var(--navy);
+  filter: brightness(1.08);
+}
+
+/* ------------------------------------------------------------------ fields */
+
+.field {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--s2);
+  align-items: center;
+  margin-top: var(--s2);
+}
+
+input[type="text"] {
+  flex: 1 1 260px;
+  min-width: 0;
+  padding: 8px 10px;
+  border: 1px solid var(--rule-strong);
+  border-radius: 4px;
+  background: var(--paper);
+  color: var(--ink);
+  font: 13px/1.4 var(--mono);
+}
+
+input[type="text"]:focus {
+  border-color: var(--navy);
+}
+
+.toggle {
+  display: flex;
+  gap: var(--s2);
+  align-items: flex-start;
+  cursor: pointer;
+}
+
+.toggle input {
+  margin: 3px 0 0;
+  accent-color: var(--navy);
+  flex: none;
+}
+
+.toggle span {
+  font-size: 13.5px;
+  color: var(--ink-soft);
+}
+
+/* -------------------------------------------------------------------- ask */
+
+.ask {
+  margin-top: var(--s3);
+  padding-top: var(--s3);
+  border-top: 1px solid var(--rule);
+}
+
+.question {
+  margin: 0;
+  font-size: 15px;
+  font-weight: 600;
+}
+
+/* An error explains the fix. It never apologises and it never blames. */
+.error {
+  margin: var(--s2) 0 0;
+  padding-left: var(--s2);
+  border-left: 3px solid var(--red);
+  color: var(--ink);
+  font-size: 13.5px;
+}
+
+/* --------------------------------------------------------------- the walk */
+
+/* The wizard's own prose, rendered one line per say event. Levels are the
+   weights the terminal renders as colour, and they keep their meaning here. */
+/*
+ * One paragraph, not one line per event.
+ *
+ * The wizard's prose is written for a terminal: it wraps itself at about
+ * seventy-eight characters and indents continuations by four or seven spaces to
+ * sit under a prefix the terminal draws. Rendered a line at a time in a window
+ * that is a different width, that layout reads as a stack of ragged fragments
+ * with mysterious indents. `setup.js` reassembles the paragraphs instead, so the
+ * words are the wizard's own and the shape is the window's.
+ */
+.said {
+  margin: 0 0 var(--s2);
+  font-size: 13.5px;
+}
+
+.said-step {
+  padding-left: 16px;
+  text-indent: -16px;
+  font-weight: 500;
+}
+
+.said-step::before {
+  content: "\2192\00a0";
+  color: var(--navy);
+}
+
+.said-note {
+  color: var(--ink-soft);
+}
+
+.said-problem {
+  color: var(--red);
+}
+
+.said-good {
+  color: var(--mark-ok);
+  font-weight: 500;
+}
+
+/* A console deep link. The core opened it, or could not; the page never does.
+   So it is shown as text to copy, never as an anchor. */
+.link-row {
+  margin: var(--s2) 0;
+  padding: var(--s2);
+  border: 1px dashed var(--rule-strong);
+  border-radius: 4px;
+  background: var(--sunk);
+}
+
+.link-row .path {
+  display: block;
+  color: var(--navy);
+}
+
+.link-row .opened {
+  display: block;
+  margin-top: 4px;
+  font-size: 12px;
+  color: var(--grey);
+}
+
+/* The drop target for the downloaded client JSON. Present only while that is
+   the open question, because a drop zone that is always there is a drop zone
+   that answers the wrong thing. */
+.drop {
+  margin-top: var(--s2);
+  padding: var(--s3);
+  border: 1px dashed var(--rule-strong);
+  border-radius: 6px;
+  background: var(--sunk);
+  text-align: center;
+  font-size: 13.5px;
+  color: var(--ink-soft);
+  transition: border-color 120ms linear, background-color 120ms linear;
+}
+
+.drop.over {
+  border-color: var(--navy);
+  border-style: solid;
+  background: var(--sky);
+  color: var(--ink);
+}
+
+/* The Downloads watcher, running while the question is open. A quiet pulsing
+   dot rather than a spinner: the tool is waiting, not working. */
+.watching {
+  display: flex;
+  gap: var(--s2);
+  align-items: center;
+  margin-top: var(--s2);
+  font-size: 13px;
+  color: var(--ink-soft);
+}
+
+.watching::before {
+  content: "";
+  width: 7px;
+  height: 7px;
+  border-radius: 50%;
+  background: var(--navy);
+  animation: breathe 2.4s ease-in-out infinite;
+  flex: none;
+}
+
+@keyframes breathe {
+  0%,
+  100% {
+    opacity: 0.25;
+  }
+  50% {
+    opacity: 1;
+  }
+}
+
+/* ---------------------------------------------------------- scary moments */
+
+/*
+ * Three screens exist only to make something frightening ordinary: Google's
+ * unverified app interstitial, Windows SmartScreen, and the Windows 11 tray
+ * overflow. Each carries ONE calm sentence and one illustrative frame.
+ *
+ * The frames are line drawings and they are deliberately NOT screenshots. A
+ * fabricated Google or Windows screenshot would be a small forgery of somebody
+ * else's product, and it would be wrong the moment either of them ships a
+ * redesign. A diagram that obviously is a diagram ages honestly.
+ *
+ * Each frame is a capture slot: swapping in a real screenshot is deleting the
+ * <svg> and uncommenting the <img> beside it, which is marked in the HTML.
+ */
+.scare {
+  margin-top: var(--s3);
+}
+
+.scare__line {
+  margin: 0 0 var(--s2);
+  font-size: 14.5px;
+}
+
+.frame {
+  margin: 0;
+  padding: var(--s3);
+  border: 1px solid var(--rule);
+  border-radius: 6px;
+  background: var(--sunk);
+}
+
+.frame svg {
+  display: block;
+  width: 100%;
+  height: auto;
+  max-width: 420px;
+  margin: 0 auto;
+}
+
+.frame figcaption {
+  margin-top: var(--s2);
+  font-size: 12px;
+  color: var(--grey);
+  text-align: center;
+}
+
+/* Diagram ink. Stated here rather than on each shape so a redraw is one edit. */
+.dg-line {
+  fill: none;
+  stroke: var(--grey);
+  stroke-width: 1.5;
+}
+
+.dg-fill {
+  fill: var(--rule);
+  stroke: none;
+}
+
+.dg-hit {
+  fill: none;
+  stroke: var(--red);
+  stroke-width: 2;
+}
+
+.dg-hit-fill {
+  fill: var(--red);
+  stroke: none;
+}
+
+.dg-text {
+  fill: var(--ink-soft);
+  font: 500 11px var(--text);
+}
+
+.dg-text-hit {
+  fill: var(--red);
+  font: 600 11px var(--text);
+}
+
+/* The step numbers, reversed out of a red disc. Paper rather than white, so
+   the diagram reads as printed on the same sheet as the page. */
+.dg-num {
+  fill: var(--paper);
+  font: 600 11px var(--text);
+}
+
+/* ----------------------------------------------------------------- lists */
+
+.list {
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+
+.list li {
+  display: flex;
+  gap: var(--s2);
+  align-items: baseline;
+  padding: 7px 0;
+  border-bottom: 1px solid var(--rule);
+}
+
+.list li:last-child {
+  border-bottom: 0;
+}
+
+.list time {
+  flex: none;
+  width: 46px;
+  font: 12px var(--mono);
+  color: var(--grey);
+}
+
+.what {
+  min-width: 0;
+  word-break: break-word;
+}
+
+.empty {
+  color: var(--grey);
+  font-style: italic;
+}
+
+/* A row that can be acted on: what it names on the left, its own buttons on the
+   right. The Watching list uses it so a folder is opened and removed from the row
+   it is named in, rather than from a
+   control that has to agree with a selection or guess which one was meant. The
+   hairline under the row is the list's, already there, which is why nothing here
+   draws a second one. */
+.list li.acted {
+  align-items: center;
+}
+
+.row-actions {
+  flex: none;
+  margin-left: auto;
+  display: flex;
+  gap: var(--s1);
+}
+
+/* Smaller than a section's own buttons, because a row has several and the
+   section below has the one that matters. */
+.row-actions button {
+  padding: 4px 10px;
+  font-size: 12.5px;
+}
+
+/* The row mid question. It becomes a small column so the sentence has room to be
+   a sentence: "are you sure" with no object is how a person ends up removing the
+   wrong folder. */
+.list li.asking {
+  flex-direction: column;
+  align-items: stretch;
+  gap: var(--s1);
+}
+
+.list li.asking .row-actions {
+  margin-left: 0;
+}
+
+/* A health mark. Small, and the word beside it says the same thing, so the
+   colour is a second opinion rather than the only one. */
+.mark {
+  flex: none;
+  display: inline-flex;
+  gap: 7px;
+  align-items: baseline;
+  width: 92px;
+  font: 500 11px var(--text);
+  letter-spacing: 0.05em;
+  text-transform: uppercase;
+  color: var(--ink-soft);
+}
+
+.mark::before {
+  content: "";
+  width: 8px;
+  height: 8px;
+  border-radius: 50%;
+  background: var(--grey);
+  transform: translateY(-1px);
+  flex: none;
+}
+
+.mark-ok::before {
+  background: var(--mark-ok);
+}
+
+.mark-note::before {
+  background: var(--navy);
+}
+
+.mark-warn::before {
+  background: var(--mark-warn);
+}
+
+.mark-fail::before {
+  background: var(--mark-bad);
+}
+
+.detail {
+  margin: 4px 0 0;
+  font-size: 13px;
+  color: var(--ink-soft);
+}
+
+/* -------------------------------------------------------------- counters */
+
+.counters {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(112px, 1fr));
+  gap: var(--s2);
+  margin-bottom: var(--s3);
+}
+
+.counter {
+  padding-left: var(--s2);
+  border-left: 1px solid var(--rule);
+}
+
+.counter b {
+  display: block;
+  font: 600 22px/1.2 var(--mono);
+  color: var(--ink);
+  letter-spacing: -0.01em;
+}
+
+.counter span {
+  font-size: 12px;
+  color: var(--ink-soft);
+}
+
+/* ------------------------------------------------------------- attention */
+
+/* The one thing worth looking at, when there is one. Airmail red, because this
+   is the other place red is allowed: the rail, and something being wrong. */
+.attention {
+  margin-top: var(--s3);
+  padding: var(--s2) var(--s3);
+  border-left: 3px solid var(--red);
+  background: var(--sunk);
+}
+
+.attention h2 {
+  margin-bottom: 4px;
+  color: var(--red);
+}
+
+/* ------------------------------------------------------------------- nav */
+
+/* Status and health are two views of one window. Whichever the tray opens, the
+   other is one click away, and the click is a plain in place navigation: no
+   window is created, so the no-window-at-idle law is untouched. */
+.tabs {
+  display: flex;
+  gap: var(--s3);
+  margin-bottom: var(--s3);
+  padding-bottom: var(--s2);
+  border-bottom: 1px solid var(--rule);
+}
+
+.tabs a {
+  padding-bottom: 6px;
+  border-bottom: 2px solid transparent;
+  color: var(--ink-soft);
+  font-size: 13.5px;
+  font-weight: 500;
+  text-decoration: none;
+}
+
+.tabs a:hover {
+  color: var(--ink);
+}
+
+.tabs a[aria-current="page"] {
+  border-bottom-color: var(--navy);
+  color: var(--ink);
+}
+
+/* ------------------------------------------------------------------ language */
+
+/*
+ * The language control, top right, per TRAY-DESIGN's i18n section.
+ *
+ * It ships hidden and empty on every page: i18n.js builds it only when the
+ * locale registry holds a second language, so with English alone none of this
+ * ever paints and the pages are the ones that were designed.
+ *
+ * The design brief for it is one word: quiet. A label in the eyebrow's own mono
+ * face and a hairline select, in the corner where a form's least important
+ * control belongs, and nothing about it competes with the airmail edge. It is
+ * absolutely positioned in the setup page's top right, and on the everyday
+ * windows it rides the right end of the tab strip instead, because a header with
+ * one row in it is better than a header with two.
+ */
+.lang {
+  position: absolute;
+  top: var(--s3);
+  right: var(--s4);
+}
+
+.tabs .lang {
+  position: static;
+  margin-left: auto;
+}
+
+.lang__label {
+  display: flex;
+  gap: var(--s1);
+  align-items: center;
+  font: 400 11px/1.4 var(--mono);
+  letter-spacing: 0.16em;
+  text-transform: uppercase;
+  color: var(--grey);
+}
+
+.lang select {
+  padding: 3px 6px;
+  border: 1px solid var(--rule);
+  border-radius: 4px;
+  background: var(--paper);
+  color: var(--ink-soft);
+  font: 400 12.5px/1.3 var(--text);
+  letter-spacing: normal;
+  text-transform: none;
+}
+
+.lang select:hover {
+  color: var(--ink);
+}
+
+/* ---------------------------------------------------------------- welcome */
+
+.welcome {
+  display: flex;
+  gap: var(--s4);
+  align-items: flex-start;
+}
+
+.welcome__words {
+  min-width: 0;
+}
+
+/* The mascot appears twice in the whole package: here, and on the postmark.
+   It is a greeting and a reward, never a background. */
+.mascot {
+  flex: none;
+  width: 132px;
+  height: 132px;
+  image-rendering: auto;
+}
+
+@media (max-width: 620px) {
+  .welcome {
+    flex-direction: column-reverse;
+    gap: var(--s3);
+  }
+
+  .mascot {
+    width: 96px;
+    height: 96px;
+  }
+}
+
+/* --------------------------------------------------------------- postmark */
+
+/*
+ * The completion moment. One orchestrated animation, about a second end to
+ * end: the mascot rises, the postmark stamps over it, the line underneath
+ * arrives. Under prefers-reduced-motion every part of it appears at once,
+ * already in place, which is a different rendering of the same picture rather
+ * than a lesser one.
+ */
+.delivery {
+  position: relative;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  margin-top: var(--s3);
+  padding: var(--s4) var(--s3);
+  text-align: center;
+}
+
+/*
+ * The stamp lands beside the photograph, not on top of it.
+ *
+ * The first cut centred the postmark over the mascot and it was the right idea
+ * and the wrong picture: the date ran across the bird's face and neither one
+ * could be read. A postmark on an envelope sits next to what it franks and its
+ * ring just crosses the edge, so that is the arrangement, with an 18px overlap
+ * doing all the work of saying the two belong together.
+ */
+.delivery__art {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  justify-content: center;
+  width: 100%;
+  min-height: 168px;
+}
+
+.delivery__art .mascot {
+  width: 116px;
+  height: 116px;
+}
+
+.postmark {
+  width: 152px;
+  height: 152px;
+  margin-left: -18px;
+  opacity: 0.88;
+  transform: rotate(-13deg);
+  transform-origin: 50% 50%;
+}
+
+/*
+ * The orchestration is opt in, and the resting state above is the finished
+ * picture. A page whose script never ran, or ran and threw, shows the postmark
+ * already stamped rather than an empty square: an animation is the nicest way
+ * to arrive somewhere and it is never the only way.
+ */
+.delivery.play .delivery__art .mascot {
+  opacity: 0;
+  animation: arrive 520ms cubic-bezier(0.2, 0.7, 0.3, 1) 80ms forwards;
+}
+
+.delivery.play .postmark {
+  opacity: 0;
+  animation: stamp 380ms cubic-bezier(0.18, 0.9, 0.32, 1) 620ms forwards;
+}
+
+.delivery.play .delivery__line {
+  opacity: 0;
+  animation: arrive 400ms ease-out 900ms forwards;
+}
+
+/*
+ * Postmark ink: airmail red, slightly transparent, as a rubber stamp is.
+ *
+ * Two rings, the name arced over the top, the word arced under the bottom, the
+ * date across the middle. A real cancellation also carries killer bars beside
+ * the date and this one deliberately does not: at this size they land on top of
+ * the date and strike it through, and a postmark whose date cannot be read is
+ * an ornament rather than a receipt.
+ */
+.postmark circle {
+  fill: none;
+  stroke: var(--red);
+  stroke-width: 2.5;
+}
+
+.postmark text {
+  fill: var(--red);
+  font: 700 17px var(--slab);
+  letter-spacing: 0.14em;
+}
+
+.postmark .postmark__date {
+  font: 600 15px var(--mono);
+  letter-spacing: 0.08em;
+}
+
+.delivery__line {
+  margin-top: var(--s3);
+  font-size: 15px;
+}
+
+@keyframes arrive {
+  from {
+    opacity: 0;
+    transform: translateY(10px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+@keyframes stamp {
+  from {
+    opacity: 0;
+    transform: rotate(-13deg) scale(1.7);
+  }
+  60% {
+    opacity: 0.95;
+  }
+  to {
+    opacity: 0.88;
+    transform: rotate(-13deg) scale(1);
+  }
+}
+
+/* ------------------------------------------------------------------ motion */
+
+/*
+ * Reduced motion is honoured everywhere, including the rail. Somebody who has
+ * asked the system for stillness gets the finished state instantly: the rail
+ * jumps to its new height, the postmark is simply there, the waiting dot holds
+ * steady instead of breathing.
+ */
+@media (prefers-reduced-motion: reduce) {
+  *,
+  *::before,
+  *::after {
+    animation-duration: 1ms !important;
+    animation-delay: 0ms !important;
+    animation-iteration-count: 1 !important;
+    transition-duration: 1ms !important;
+  }
+
+  .delivery.play .postmark {
+    opacity: 0.88;
+    transform: rotate(-13deg) scale(1);
+  }
+
+  .delivery.play .delivery__art .mascot,
+  .delivery.play .delivery__line {
+    opacity: 1;
+    transform: none;
+  }
+
+  .watching::before {
+    opacity: 1;
+  }
+}
+
+/* ---------------------------------------------------------------- footer */
+
+footer {
+  margin-top: var(--s4);
+  padding-top: var(--s3);
+  border-top: 1px solid var(--rule);
+  font-size: 12.5px;
+  color: var(--grey);
+}
+
+footer p {
+  margin: 0 0 var(--s1);
+}

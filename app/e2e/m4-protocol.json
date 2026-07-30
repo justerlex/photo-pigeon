@@ -1,0 +1,427 @@
+{
+  "$comment": [
+    "What run-m4.ps1 expects the M4 core and the M4 shell to say. One file, so a",
+    "rename on either side costs an edit here rather than a hunt through a rig.",
+    "The same job m3-vocabulary.json does for M3, and the same rule about who",
+    "wins: when app/scripts/sidecar-layout.json carries a `setup` block or a",
+    "`window` block, THOSE win, because the shell is held against that file by a",
+    "drift test in paths.rs and nothing holds this copy to anything.",
+    "",
+    "WRITERS OF THE TRUTH: docs/ASK-PROTOCOL.md for the channel, the setup",
+    "channel module in src/commands/ for the event shapes, and",
+    "app/src-tauri/src/ for the window side.",
+    "READER: app/e2e/run-m4.ps1.",
+    "",
+    "PROVENANCE, 29 July 2026. This file was first written on a worktree branched",
+    "from main, where docs/ASK-PROTOCOL.md did not exist, so its shapes were the",
+    "ones the M4 brief and TRAY-DESIGN section 3 describe. It has since been",
+    "CORRECTED against the real thing: src/commands/setup-channel.ts and",
+    "src/wizard/steps.ts as they stand on the ask branch. Three of the guesses",
+    "were wrong and all three mattered:",
+    "",
+    "  the answer form is `answer <id> <json value>`, three fields separated by",
+    "  spaces, NOT a JSON envelope carrying the id",
+    "  the question's prose is on `prompt`, not `message`, and every ask also",
+    "  carries a STABLE `name`, which is a far better thing to match a scripted",
+    "  answer on than a sentence somebody may reword",
+    "  a refused answer produces `answer-refused` and the question STAYS LIVE. It",
+    "  is not re-asked, so a driver waiting for a second ask event waits forever",
+    "",
+    "Where this file and the code disagree the code wins and this file is the",
+    "bug. Every scenario that depends on a shape the build does not speak yet",
+    "SKIPS with a sentence rather than failing."
+  ],
+
+  "detect": {
+    "$comment": [
+      "How the rig decides whether the thing in front of it is an M4 build at",
+      "all. Both are questions asked of the build rather than of a version",
+      "string: a version says what somebody typed, --help says what shipped."
+    ],
+    "coreSetupHelpMarker": "--events",
+    "coreDoctorHelpMarker": "--json",
+    "configOptionMarker": "-c, --config"
+  },
+
+  "setup": {
+    "$comment": [
+      "The setup channel. `-c` is not decoration: it is the only thing standing",
+      "between this rig and the real ~/.photo-pigeon on this machine, so the rig refuses",
+      "to run setup at all unless the built CLI declares it. See the safety",
+      "block at the top of run-m4.ps1."
+    ],
+    "args": ["setup", "--events", "ndjson", "-c", "{configPath}"],
+    "noOpenFlag": "--no-open",
+    "$noOpenFlag": [
+      "Prints the console deep links instead of handing them to a browser.",
+      "Passed when the build declares it, because a rig that opens six Google",
+      "Cloud tabs on somebody's desktop is a rig nobody runs twice. When it is",
+      "absent the rig still runs, and says in its output that a browser may have",
+      "opened."
+    ],
+    "answerWord": "answer",
+    "answerForm": "object",
+    "answerIdField": "id",
+    "answerValueField": "value",
+    "$answerForm": [
+      "The one payload-carrying form M4 is allowed to add, and it is a form",
+      "rather than a seventh word. Two shapes were written for M4 by different",
+      "hands and only one can exist on a wire. Checked against",
+      "src/commands/setup-channel.ts, which is the authority:",
+      "",
+      "  object       answer {\"id\":\"<ask id>\",\"value\":<json value>}   <- ships",
+      "  idThenValue  answer <ask id> <json value>",
+      "",
+      "  answer {\"id\":\"3\",\"value\":true}",
+      "  answer {\"id\":\"5\",\"value\":\"C:\\Users\\casey\\Pictures\"}",
+      "",
+      "The payload is JSON either way, so a string carries its quotes and its",
+      "escapes: it is where a Windows path lives and the backslashes have to",
+      "survive. The other shape is named rather than forgotten because a rig",
+      "that hardcodes a grammar is a rig that lies about which one it tested.",
+      "Everything else on the core's stdin is still one of the six bare words,",
+      "and setup answers none of them but stop and quit."
+    ],
+    "maxAttemptsPerAsk": 3,
+    "$maxAttemptsPerAsk": [
+      "A refused answer leaves the question LIVE and is not re-asked, so a rig",
+      "that answers once and waits waits forever. The driver answers again when",
+      "a refusal names a question it answered, and gives up after this many",
+      "tries with the refusal's own sentence in the report. Without the cap a",
+      "genuinely invalid answer becomes an infinite loop between two programs",
+      "that are each behaving correctly."
+    ]
+  },
+
+  "events": {
+    "$comment": [
+      "Arrays because a rig that accepts one spelling and dies on a synonym is a",
+      "rig that fails the day somebody is right. The first entry in each is the",
+      "name setup-channel.ts really emits; the rest are the names this file",
+      "guessed before the protocol existed, kept so the rig reads an older or a",
+      "newer build without an edit."
+    ],
+    "setupStarted": ["started", "setup-started"],
+    "heading": ["step", "heading"],
+    "say": ["say"],
+    "link": ["link"],
+    "ask": ["ask"],
+    "refused": ["answer-refused", "answered"],
+    "cancelled": ["ask-closed", "cancelled"],
+    "written": ["configured", "setup-written", "config-written"],
+    "signingIn": ["signing-in"],
+    "done": ["signed-in", "setup-done"],
+    "failed": ["failed"],
+    "stopping": ["stopping"],
+    "stopped": ["stopped"],
+    "delivered": ["delivered"]
+  },
+
+  "writtenFields": {
+    "$comment": [
+      "`configured` carries `written: false` when the user kept the config that",
+      "was already on disk, which is a different thing from a setup having",
+      "written one. The rig checks the field when it is there."
+    ],
+    "written": "written",
+    "configPath": "configPath",
+    "watchDirs": "watchDirs"
+  },
+
+  "askFields": {
+    "$comment": [
+      "The field names on an `ask` event. Named here rather than inline in the",
+      "rig so that a protocol which spells `kind` as `type` costs one edit.",
+      "",
+      "`name` is the one to match a scripted answer on: it is a stable",
+      "identifier the wizard chose, where `prompt` is prose somebody may reword",
+      "between milestones. The answer script tries the name first and falls back",
+      "to the prose, so this rig reads a build that has names and one that does",
+      "not.",
+      "",
+      "`error` is on no event this protocol emits. It is kept because the rig's",
+      "driver reads a re-ask carrying one as a second attempt, which is the",
+      "other shape a channel like this can take, and reading both costs nothing."
+    ],
+    "id": "id",
+    "name": "name",
+    "kind": "kind",
+    "message": "prompt",
+    "messageFallback": "message",
+    "default": "default",
+    "error": "error",
+    "confirmKind": "confirm",
+    "inputKind": "input",
+    "pickKind": "pick"
+  },
+
+  "refusedFields": {
+    "$comment": [
+      "A refusal names the question it is about when it has one, and carries a",
+      "sentence fit to show a person.",
+      "",
+      "The shipped core answers EVERY answer line on one event type, an",
+      "`answered` carrying `accepted`. The receipt for a good answer and the",
+      "refusal of a bad one are therefore the same event with a different",
+      "verdict, and `accepted` is the whole of the difference. A driver that",
+      "counts a receipt as a refusal answers a question that is already closed,",
+      "then answers the refusal of that, until the attempt cap saves it.",
+      "",
+      "`detail` and `error` are both read, because the two M4 protocols spelled",
+      "the sentence differently and reading both costs one line."
+    ],
+    "id": "id",
+    "reason": "reason",
+    "detail": "detail",
+    "detailFallback": "error",
+    "accepted": "accepted"
+  },
+
+  "answerScript": {
+    "$comment": [
+      "The scripted answers, matched in order, first match wins. `kind` is",
+      "'confirm', 'input', 'pick' or 'any'. `name` is an exact match against the",
+      "ask's stable name and is tried FIRST, because a name is chosen and a",
+      "prompt is prose. `match` is a regex tested against the prompt, case",
+      "insensitively, and is what answers a build whose asks carry no name.",
+      "`value` is either a literal or one of the substitution tokens below,",
+      "which the rig fills in from the run directory it made.",
+      "",
+      "  {watchDir}         the throwaway folder the fake photos land in",
+      "  {credentialsPath}  a synthetic client JSON in the sandbox, never real",
+      "  {projectId}        a made up Google project id",
+      "  {albumName}        the album name, the same one the other rigs use",
+      "",
+      "The last two rules are the catch-all, and they are the reason a wording",
+      "change in the wizard does not break this rig: an unmatched confirm takes",
+      "the question's own default, an unmatched input answers empty. Both are",
+      "recorded in the report so a run that fell through to them can be read",
+      "afterwards rather than trusted."
+    ],
+    "rules": [
+      {
+        "$why": "Re-running setup over a config that is already there. In a fresh temp environment this never fires, and when it does the rig wants the replacement, not the keep, or nothing below is testing a setup.",
+        "name": "replace-setup",
+        "kind": "confirm",
+        "match": "run through setup again|replace it",
+        "value": true
+      },
+      {
+        "$why": "Project created? A human saying they did the thing in the console. Nothing is checked against Google, which is why a rig may answer yes.",
+        "name": "project-created",
+        "kind": "confirm",
+        "match": "project created",
+        "value": true
+      },
+      {
+        "$why": "Photos Library API enabled? Same shape, same reason.",
+        "name": "api-enabled",
+        "kind": "confirm",
+        "match": "api enabled",
+        "value": true
+      },
+      {
+        "$why": "Sign-in screen saved? Same shape, same reason.",
+        "name": "consent-saved",
+        "kind": "confirm",
+        "match": "screen saved",
+        "value": true
+      },
+      {
+        "$why": "Publishing status now says In production? The most important click in the whole setup, and the one the wizard refuses to let anybody skip. Answering no here loops forever.",
+        "name": "published",
+        "kind": "confirm",
+        "match": "in production",
+        "value": true
+      },
+      {
+        "$why": "The project id. Only ever used to deep link the console, so a made up one is honest here and reaches nothing. It must not contain the word google, which the wizard checks.",
+        "name": "project-id",
+        "kind": "input",
+        "match": "project id",
+        "value": "{projectId}"
+      },
+      {
+        "$why": "A client JSON already sitting in the sandbox Downloads folder. The rig put it there, so yes.",
+        "name": "use-found-credentials",
+        "kind": "confirm",
+        "match": "^found .*\\.json.*use it",
+        "value": true
+      },
+      {
+        "$why": "The typed path for the client JSON, when the Downloads watcher did not win the race.",
+        "name": "credentials-path",
+        "kind": "input",
+        "match": "paste the full path|waiting for the download",
+        "value": "{credentialsPath}"
+      },
+      {
+        "$why": "The one folder this run watches. Validated by the core against the real file system, so it has to exist, and it does.",
+        "name": "watch-dir",
+        "kind": "input",
+        "match": "which folder|path of the next folder",
+        "value": "{watchDir}"
+      },
+      {
+        "$why": "One folder is enough. A second would only make the assertion about watchDirs longer.",
+        "name": "another-folder",
+        "kind": "confirm",
+        "match": "add another folder",
+        "value": false
+      },
+      {
+        "$why": "An album, so that the written config carries albumName and the assertion about it has something to read.",
+        "name": "wants-album",
+        "kind": "confirm",
+        "match": "one album",
+        "value": true
+      },
+      {
+        "$why": "The album name. The same one run-e2e.ps1 uses, so a human can find and delete everything this project ever made in one place.",
+        "name": "album-name",
+        "kind": "input",
+        "match": "album name",
+        "value": "{albumName}"
+      },
+      {
+        "$why": "CATCH ALL. An unrecognised confirm takes the question's own default, which is what a user pressing Enter does.",
+        "kind": "confirm",
+        "match": ".*",
+        "value": "{default}"
+      },
+      {
+        "$why": "CATCH ALL. A pick takes its own default too. A rig choosing from a list nobody wrote a rule for is a rig making a product decision.",
+        "kind": "pick",
+        "match": ".*",
+        "value": "{default}"
+      },
+      {
+        "$why": "CATCH ALL. An unrecognised input answers empty, which the wizard reads as skip wherever it allows one.",
+        "kind": "input",
+        "match": ".*",
+        "value": ""
+      }
+    ]
+  },
+
+  "doctor": {
+    "$comment": [
+      "doctor --json against the throwaway environment. `ok` is the verdict and",
+      "`checks` is the list; the rig reads both and reports every check that is",
+      "not ok by name, because 'doctor is red' with no line number is a bug",
+      "report nobody can act on.",
+      "",
+      "Green here means ok:true, which is 'no check FAILED'. Notes and warnings",
+      "are expected and are printed rather than counted against the run: a",
+      "throwaway setup has never signed in, so 'Not signed in yet' is a warning",
+      "the rig should read and not a failure it should hide."
+    ],
+    "args": ["doctor", "--json", "-c", "{configPath}"],
+    "okField": "ok",
+    "checksField": "checks",
+    "levelField": "level",
+    "failLevel": "fail"
+  },
+
+  "window": {
+    "$comment": [
+      "The first-run window, and how a script can make one exist without a",
+      "hand on the mouse.",
+      "",
+      "The trigger is not a test-only back door and that is deliberate: a tray",
+      "that starts and finds NO config is exactly the machine the M4 exit",
+      "criterion describes, and opening the first-run window is what it is",
+      "supposed to do. So the rig points PHOTO_PIGEON_CONFIG at a path in a",
+      "temp directory where no file exists, launches, and waits for a window.",
+      "",
+      "openEnv is the escape hatch: if the shell grows a variable or a flag that",
+      "opens a named window on launch, name it here and the rig uses it instead",
+      "of relying on the no-config path. Neither is required for the rig to",
+      "refuse safely: with no window at all every window scenario skips."
+    ],
+    "titleMarker": "Photo Pigeon",
+    "$titleMarker": [
+      "A substring the setup window's title carries. The naming law says every",
+      "human surface reads Photo Pigeon, so the title does. The rig matches on",
+      "the substring and records the full title as evidence, so a copy change",
+      "costs nothing."
+    ],
+    "openEnv": "",
+    "openArg": "",
+    "webviewProcessName": "msedgewebview2",
+    "shellLogWindowMarkers": {
+      "$comment": "Substrings the rig looks for in the shell's own log. Absent, the matching check warns instead of passing, because a silent log is not proof.",
+      "created": "window",
+      "destroyed": "destroyed"
+    }
+  },
+
+  "handles": {
+    "$comment": [
+      "The handle count probe TRAY-DESIGN asks for at the end of section 6:",
+      "'164 fresh against 415 after a day, which is worth confirming settles",
+      "rather than climbing once the menu has been rebuilt a few thousand",
+      "times'. Windows arriving at M4 is the moment that question stops being",
+      "theoretical, so the rig opens and closes one three times and watches the",
+      "shape of the line rather than its height.",
+      "",
+      "The FIRST open is not a leak and must never be scored as one. The same",
+      "A/B in section 6 measured what it is: the Windows shell and UI stack",
+      "mapping in, 54 modules the fresh process did not have, paid once. So the",
+      "probe scores the SLOPE AFTER the first cycle, and records the one-off",
+      "separately as evidence for the row in section 6 that M4 owns."
+    ],
+    "cycles": 3,
+    "perCycleTolerance": 12,
+    "$perCycleTolerance": [
+      "Handles per open/close cycle, averaged over the cycles after the first.",
+      "Twelve is deliberately loose: the number that matters is whether the line",
+      "is flat or climbing, and a probe that fails on three handles of noise",
+      "gets switched off within a week. A real leak of one window's worth of",
+      "handles is tens to hundreds per cycle and this catches it easily."
+    ],
+    "settleSeconds": 3,
+    "$settleSeconds": [
+      "How long to let the shell settle after each open and each close before",
+      "reading. Handles come back when the webview host really goes, and that is",
+      "not instant."
+    ]
+  },
+
+  "memory": {
+    "$comment": [
+      "The RAM row TRAY-DESIGN section 6 leaves explicitly unfilled for M4:",
+      "'the first-run window open RAM row is explicitly unfilled and belongs to",
+      "M4'. The rig fills it by measuring rather than by reasoning.",
+      "",
+      "Project decision: the budget is about PRIVATE working",
+      "set, 15 MB target and 25 MB reopen. Total working set stays an",
+      "observation and is never a trigger, because 28 of the 32 megabytes in",
+      "section 6's table are Windows' own file-backed pages and this app does",
+      "not control one of them.",
+      "",
+      "The webview processes are measured and recorded and are NOT scored. They",
+      "are Microsoft's runtime rather than this project's binary, no budget has",
+      "ever been agreed for them, and inventing one inside a rig is how a",
+      "number nobody agreed to ends up gating a release."
+    ],
+    "shellPrivateTargetMB": 15,
+    "shellPrivateCeilingMB": 25
+  },
+
+  "firstDelivery": {
+    "$comment": [
+      "The project rule about the happy toast, in the form",
+      "the rig can check.",
+      "",
+      "'First ever' means the ledger was empty before that delivery. It is",
+      "core-owned truth and it travels on the event. The shell-owned flag file",
+      "is DELETED as a migration, so the rig asserts its ABSENCE from",
+      "shell-state.json: a shell still keeping its own count is a shell that can",
+      "disagree with the ledger, and the disagreement is silent."
+    ],
+    "eventField": "firstEver",
+    "retiredShellStateKey": "firstDeliveryToastShown",
+    "shellStateLeaf": "shell-state.json"
+  }
+}

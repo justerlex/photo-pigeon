@@ -1,0 +1,219 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>Photo Pigeon: Status</title>
+    <!--
+      Status and history: what this copy of Photo Pigeon has done since it
+      started, where it is doing it, and the controls that change it.
+
+      This is the main UI, per the status-window reshape: a
+      left click on the tray opens this window, so Pause, Resume and Deliver now
+      live here and the tray menu keeps its own copies of them. Both surfaces
+      render one supervisor truth and neither of them computes it, which is why
+      the buttons below carry no wording of their own.
+
+      Two things TRAY-DESIGN puts here specifically:
+
+        * the storage law in full. The tray tooltip gets 127 UTF-16 units and
+          can only carry the short form, so this is the surface where the whole
+          sentence lives, and it is never buried in an About box.
+        * the counters, per session and labelled as such. The shell has no date
+          bookkeeping and will not claim what it cannot count.
+
+      The page chrome carries data-i18n keys into app/ui/locales/en.json, per
+      TRAY-DESIGN's i18n section, and it is a scaffold only: English is the
+      text standing in this file. Nothing the supervisor sends is keyed. The status
+      line, the storage line and the storage honesty sentence are repainted from
+      the snapshot, so they are the shell's and the core's words rather than this
+      page's, and they travel with the Rust strings at v0.2.
+
+      Status and health are two views of one window and the strip at the top
+      moves between them. The move is an ordinary in place navigation to another
+      local page: no window is created, so the no-window-at-idle law in
+      TRAY-DESIGN section 1 is untouched, and windows.rs stays the closed enum
+      it is. See app/ui/README notes in the CSS header for the rest.
+    -->
+    <link rel="stylesheet" href="pigeon.css" />
+  </head>
+  <body>
+    <!-- The airmail edge, already inked. See pigeon.css: the everyday windows
+         wear the same stripe the wizard fills. -->
+    <div class="rail rail--static" aria-hidden="true">
+      <div class="rail__fill"></div>
+    </div>
+
+    <main class="page">
+      <div class="column">
+        <nav class="tabs">
+          <a href="status.html" aria-current="page" data-i18n="common.tab.status">
+            Status and history
+          </a>
+          <a href="health.html" data-i18n="common.tab.health">Health</a>
+          <!-- Shown only while no config exists: the way into first run from
+               here, so an unconfigured machine's status window is a door and
+               not a dead end (the status-window reshape). -->
+          <a href="#" id="open-setup" class="hidden" data-i18n="status.tab.setup">
+            Set up Photo Pigeon
+          </a>
+
+          <!-- The language slot, mirrored from setup. Empty and hidden while
+               English is the only locale, and it sits at the right end of the
+               tab row rather than over the title, so the airmail header is
+               unchanged. -->
+          <div class="lang hidden" data-i18n-switcher></div>
+        </nav>
+
+        <p class="eyebrow">Photo Pigeon</p>
+        <!--
+          The headline row: the status sentence with the two engine actions
+          beside it: a standalone
+          strip below the amber line read as belonging to nothing and inflated
+          the page for no reason. Controls sit with the sentence they act on,
+          and the amber line still comes before everything else a person reads
+          on the way down. Open log left the trio for the footer, beside the
+          path it opens.
+
+          The engine button's key is its pre-paint fallback and nothing more:
+          every label it really wears comes off the snapshot, because which of
+          Pause and Resume it is depends on state this page cannot see, and a
+          page that guessed would be a page that can offer Pause at an engine
+          that is already paused. Both start disabled for the same reason:
+          before the first snapshot lands, nothing here is known.
+
+          Two quiet buttons and no primary. The saturated element on these
+          windows is the rail, and the loudest thing on a page about a backup
+          running well should not be the button that stops it.
+        -->
+        <div class="headline">
+          <h1 id="status-line">Starting up</h1>
+          <div class="headline__actions">
+            <button type="button" id="engine-action" data-i18n="status.action.pause" disabled>
+              Pause
+            </button>
+            <button type="button" id="deliver-now" data-i18n="status.deliverNow" disabled>
+              Deliver now
+            </button>
+          </div>
+        </div>
+        <p class="lede" id="storage-line">
+          Nothing sent yet, original quality when it goes
+        </p>
+
+        <section class="attention hidden" id="attention">
+          <h2 data-i18n="common.needsLooking">This needs looking at</h2>
+          <p id="attention-text"></p>
+        </section>
+
+        <section class="section">
+          <h2 data-i18n="status.session.heading">This session</h2>
+          <div class="counters">
+            <div class="counter">
+              <b id="c-delivered">0</b><span data-i18n="status.counter.delivered">delivered</span>
+            </div>
+            <div class="counter">
+              <b id="c-skipped">0</b><span data-i18n="status.counter.skipped">already had</span>
+            </div>
+            <div class="counter">
+              <b id="c-failed">0</b><span data-i18n="status.counter.failed">did not go</span>
+            </div>
+            <div class="counter">
+              <b id="c-bytes">0 B</b><span data-i18n="status.counter.sent">sent</span>
+            </div>
+          </div>
+          <p class="small" id="session-note" data-i18n="status.session.note">
+            Counted since this copy started, not since you installed it.
+          </p>
+
+          <!--
+            The storage law in full, word for word with STORAGE_HONESTY in
+            src/commands/watch.ts. Repainted from the snapshot at runtime so the
+            window and the core can never disagree, with the same sentence here
+            as the value before the first snapshot lands. It carries no i18n key
+            for that reason: the sentence is the core's, and it is never
+            paraphrased by anybody.
+          -->
+          <p class="honesty" id="honesty">
+            Uploads are original quality and count against your Google storage.
+            Storage Saver does not apply.
+          </p>
+        </section>
+
+        <!--
+          Watching: the folder list, and it is editable from here.
+
+          Every row owns both of its actions, so a folder is opened and removed
+          from the row it is named in and
+          there is no second list to keep in step. The one #open-watched button
+          that used to sit under this list opened whichever folder came first,
+          which is a guess that only looks right on a machine watching exactly
+          one. Adding sits below the list, because that is where a list grows.
+
+          Two things about the editing that are laws rather than choices:
+
+            * the paths this page sends back are only ever strings it was given,
+              from ipc::pick_folder or out of this snapshot, which came from the
+              core's own started event. The core revalidates every one of them
+              exactly as it validates a path a terminal user typed.
+            * removing a folder deletes nothing and un-uploads nothing. It stops
+              the folder being walked. The confirm sentence says so, because that
+              is the question somebody is actually asking when they hesitate.
+        -->
+        <section class="section">
+          <h2 data-i18n="status.watching.heading">Watching</h2>
+          <ul class="list" id="watch-dirs">
+            <li>
+              <span class="what empty" data-i18n="status.watching.empty">
+                The engine has not said what it watches yet.
+              </span>
+            </li>
+          </ul>
+          <div class="actions">
+            <button type="button" id="add-watched" data-i18n="status.watching.add">
+              Add a folder to watch
+            </button>
+          </div>
+          <!-- The core's own sentence about the last edit, or the shell's about
+               the restart it did afterwards. Never this page's own words about a
+               rule: validation lives on the side holding the file. -->
+          <p class="small hidden" id="watch-note"></p>
+        </section>
+
+        <section class="section">
+          <h2 data-i18n="status.recent.heading">Recently</h2>
+          <ul class="list" id="recent">
+            <li><span class="what empty" data-i18n="status.recent.empty">Nothing yet.</span></li>
+          </ul>
+        </section>
+
+        <section class="section">
+          <h2 data-i18n="common.autostartHeading">Start with Windows</h2>
+          <label class="toggle">
+            <input type="checkbox" id="autostart" />
+            <span id="autostart-note" data-i18n="status.autostart.note">
+              Photo Pigeon starts with Windows, so a backup tool that is meant
+              to be running is running. Turning it off leaves everything else
+              alone.
+            </span>
+          </label>
+        </section>
+
+        <footer>
+          <p id="engine" data-i18n="status.engine.notStarted">Engine: not started.</p>
+          <!-- The label is its own element because the sweep writes textContent,
+               and the path beside it is a child this page must keep. The button
+               rides the same line because this is the path it opens. -->
+          <p class="log-line">
+            <span data-i18n="status.shellLog">Shell log:</span>
+            <span class="path selectable" id="shell-log"></span>
+            <button type="button" id="open-log" data-i18n="common.openLog">Open log</button>
+          </p>
+        </footer>
+      </div>
+    </main>
+    <!-- The language scaffold first: status.js takes t() off it. -->
+    <script src="i18n.js"></script>
+    <script src="status.js"></script>
+  </body>
+</html>
