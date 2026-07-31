@@ -328,8 +328,13 @@ jobs:
       # The Node pin ships npm 10, and OIDC publishing landed in the npm CLI at
       # 11.5.1. Only the CLI moves: the pinned Node is what build-sidecar.mjs
       # stages, and nothing here stages anything.
+      #
+      # The major is pinned rather than `@latest`, which was tried first and
+      # failed: npm 12 requires node ^22.22.2 || ^24.15.0 || >=26, and this pin is
+      # 22.18.0. `@latest` on a pinned Node is a build that breaks on somebody
+      # else's release day.
       - name: npm new enough to publish over OIDC
-        run: npm install -g npm@latest
+        run: npm install -g npm@11
 
       - name: install the core's dependencies
         run: npm ci
