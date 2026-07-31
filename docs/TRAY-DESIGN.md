@@ -56,6 +56,15 @@ This is a law rather than a style preference, because half of these strings are 
 
 There is no separate display-name key to reach for: the live NSIS schema has no `displayName`. `productName` is the only lever, and a custom NSIS template to hold the install directory still is not worth owning.
 
+**The fifth name, and where it was spent.** `docs/RELEASE.md` step 7.4 left a blank for the one name this list could not decide in advance, because the SignPath Foundation form asks for a project name and a certificate makes the answer permanent. It was filled on **2026-07-31**, the day v0.1.0 was published:
+
+| The question | The answer |
+|---|---|
+| The name given on the application | **Photo Pigeon**, the display name, because it is the one a user reads on the wall the certificate exists to soften |
+| What `bundle.publisher` says afterwards | **`justerlex`**, unchanged. The signed publisher line will read "SignPath Foundation" because that is whose certificate it is, and the README says so plainly rather than letting a user discover it |
+| Maintainer contact on the application | `lex@justerlex.com` |
+| Date submitted | 2026-07-31 |
+
 ### Casing, and it is two tiers
 
 The naming law above says which letters the product's name is spelled with. This one says where Title Case is allowed at all, and it has two tiers because a window has an outside and an inside.
