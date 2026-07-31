@@ -6,6 +6,8 @@ import {
   consoleLink,
   containsGoogle,
   isPlausibleProjectId,
+  isTheSuggestedName,
+  SUGGESTED_PROJECT_NAME,
   withProject,
 } from './links.js';
 
@@ -98,12 +100,38 @@ describe('project id sanity', () => {
     expect(isPlausibleProjectId('  pigeon-4f2c  ')).toBe(true);
   });
 
+  it('accepts the derived id a second person actually gets', () => {
+    expect(isPlausibleProjectId('photo-pigeon-uploads-473829')).toBe(true);
+  });
+
   it('rejects what the console would reject', () => {
     expect(isPlausibleProjectId('Photo-Pigeon')).toBe(false);
     expect(isPlausibleProjectId('short')).toBe(false);
     expect(isPlausibleProjectId('trailing-')).toBe(false);
     expect(isPlausibleProjectId('9leading')).toBe(false);
     expect(isPlausibleProjectId('has space')).toBe(false);
+  });
+});
+
+describe('isTheSuggestedName', () => {
+  /**
+   * The v0.1.0 trap, found on the first stranger walk. Step 1 suggests a project
+   * NAME, Google derives a globally unique ID from it, and those are not the same
+   * string. The suggested name is already taken, so a person who pastes it as the
+   * id sends every later console link into a project owned by somebody else and
+   * meets a wall of missing IAM permissions that names a project they have never
+   * heard of.
+   */
+  it('catches the suggested name being pasted where an id belongs', () => {
+    expect(isTheSuggestedName(SUGGESTED_PROJECT_NAME)).toBe(true);
+    expect(isTheSuggestedName(`  ${SUGGESTED_PROJECT_NAME}  `)).toBe(true);
+    expect(isTheSuggestedName(SUGGESTED_PROJECT_NAME.toUpperCase())).toBe(true);
+  });
+
+  it('leaves a real derived id alone, suffix and all', () => {
+    expect(isTheSuggestedName(`${SUGGESTED_PROJECT_NAME}-473829`)).toBe(false);
+    expect(isTheSuggestedName('pigeon-4f2c')).toBe(false);
+    expect(isTheSuggestedName('')).toBe(false);
   });
 });
 

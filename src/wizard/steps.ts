@@ -13,7 +13,13 @@
 
 import path from 'node:path';
 import type { Ask } from './ask.js';
-import { consoleLink, containsGoogle, isPlausibleProjectId, SUGGESTED_PROJECT_NAME } from './links.js';
+import {
+  consoleLink,
+  containsGoogle,
+  isPlausibleProjectId,
+  isTheSuggestedName,
+  SUGGESTED_PROJECT_NAME,
+} from './links.js';
 import { dirExists, fileExists, type FsLike } from './fs-like.js';
 import {
   CredentialsError,
@@ -106,6 +112,13 @@ export async function stepCreateProject(ctx: StepContext): Promise<string | unde
   step(io, `Name it ${SUGGESTED_PROJECT_NAME}, or anything you like with one rule below.`);
   step(io, 'Leave organisation and location alone. Click Create and wait a moment.');
   say(io);
+  note(io, 'The name you type is not the id you are asked for below. Google makes a');
+  say(io, '       globally unique id out of it, and when the plain form is already taken');
+  say(io, `       it adds digits, so yours may read ${SUGGESTED_PROJECT_NAME}-473829 rather`);
+  say(io, '       than what you typed. The create screen prints it under the name box');
+  say(io, '       with an Edit link beside it, and afterwards it is the ID column in the');
+  say(io, '       project picker at the top of the console.');
+  say(io);
   note(io, 'Do not put the word Google in the name. Google rejects names containing');
   say(io, '       it, and the console only tells you at the very last screen.');
   say(io);
@@ -113,12 +126,15 @@ export async function stepCreateProject(ctx: StepContext): Promise<string | unde
   await confirmDone(ctx, 'Project created?', consoleLink('projectCreate'));
 
   const projectId = await ctx.ask.input({
-    message: 'Paste the project id (or press Enter to skip):',
+    message: 'Paste the project id, not the name (or press Enter to skip):',
     validate: (value) => {
       const trimmed = value.trim();
       if (!trimmed) return true;
       if (containsGoogle(trimmed)) {
         return 'That has the word Google in it, which Google does not allow. Check the id again.';
+      }
+      if (isTheSuggestedName(trimmed)) {
+        return `That is the name this wizard suggested, not the id Google made from it. The two are different strings, and that one is somebody else's project, so every link after this would open a project you cannot see. Read the id off the console: it is the ID column in the project picker, and it probably has digits on the end.`;
       }
       return isPlausibleProjectId(trimmed)
         ? true
@@ -129,6 +145,9 @@ export async function stepCreateProject(ctx: StepContext): Promise<string | unde
   const trimmed = projectId.trim();
   if (trimmed) {
     good(io, 'Every link from here on will open straight into that project.');
+    say(io, '       If a later screen says you need additional access to a project, or');
+    say(io, '       lists permissions you are missing, then this id was not yours. Nothing');
+    say(io, '       is broken: run setup again and paste the right one.');
   } else {
     note(io, 'Skipped. The links will open whichever project you last had selected,');
     say(io, '       so glance at the project name in the console header each time.');

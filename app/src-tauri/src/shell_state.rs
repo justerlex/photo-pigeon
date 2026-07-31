@@ -79,7 +79,8 @@ struct Flags {
     /// that turned the checkbox off before this flag existed has no click
     /// recorded, so its first launch after the upgrade turns start with Windows
     /// back on once, and the next off click sticks for good. Acceptable because
-    /// there is no such machine: 0.1.0 was never published.
+    /// there is no such machine: this flag shipped in 0.1.0, which is the first
+    /// version anybody could install.
     autostart_off_chosen: bool,
 }
 

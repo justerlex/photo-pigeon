@@ -1,6 +1,6 @@
 {
   "name": "photo-pigeon",
-  "version": "0.1.0",
+  "version": "0.1.1",
   "description": "Back up photos to Google Photos automatically on Windows: watch a folder, auto upload every new photo, no browser tab open",
   "keywords": [
     "google-photos",

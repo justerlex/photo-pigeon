@@ -102,7 +102,7 @@ name = "photo-pigeon-tray"
 # version, one tag, one number. That file is the only place the number is
 # written by hand. build.rs fails the build when this line disagrees with it,
 # so the number that used to drift in silence now cannot.
-version = "0.1.0"
+version = "0.1.1"
 
 description = "photo-pigeon tray shell"
 authors = ["justerlex"]

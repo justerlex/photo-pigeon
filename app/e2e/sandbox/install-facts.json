@@ -15,7 +15,7 @@
   "version": "0.1.0",
   "installedLayout": "%LOCALAPPDATA%/Photo Pigeon/{photo-pigeon.exe, pigeon-core.exe, resources/core.mjs}",
   "installerFileName": "Photo Pigeon_0.1.0_x64-setup.exe",
-  "readAt": "2026-07-30T16:27:00.2751700+03:00",
+  "readAt": "2026-07-31T01:15:37.0044764+03:00",
   "readFrom": [
     "D:\\Dev\\photo-pigeon\\app\\src-tauri\\tauri.conf.json",
     "D:\\Dev\\photo-pigeon\\app\\scripts\\sidecar-layout.json",

@@ -10,8 +10,10 @@ import path from 'node:path';
 
 import { describe, expect, it } from 'vitest';
 
+import type { Ask, InputQuestion } from './ask.js';
 import type { FsLike } from './fs-like.js';
-import { showIntro, showOutro, type StepContext } from './steps.js';
+import { SUGGESTED_PROJECT_NAME } from './links.js';
+import { showIntro, showOutro, stepCreateProject, type StepContext } from './steps.js';
 import type { WizardIo } from './ui.js';
 
 /** An fs that would throw if anything reached for it. These screens never do. */
@@ -34,14 +36,79 @@ function recordingContext(): { ctx: StepContext; text: () => string } {
       return false;
     },
   };
+  const refusingAsk: Ask = {
+    confirm: () => Promise.reject(new Error('this screen must not ask anything')),
+    input: () => Promise.reject(new Error('this screen must not ask anything')),
+  };
   return {
-    ctx: { io, openLinks: false, fs: unusedFs },
+    ctx: { io, ask: refusingAsk, openLinks: false, fs: unusedFs },
     text: () => lines.join('\n'),
   };
 }
 
 const CONFIG_PATH = path.join('/home/casey/.photo-pigeon', 'config.json');
 const DOWNLOAD = path.join('/home/casey/Downloads', 'client_secret_1234.apps.googleusercontent.com.json');
+
+/**
+ * Step 1 asks one question, so a fake Ask that answers it and hands back the
+ * validator is the whole harness. Every confirm is a yes, because the screen
+ * under test is the id question and not the loop above it.
+ */
+function askHarness(answer: string): { ask: Ask; validate: () => InputQuestion['validate'] } {
+  let captured: InputQuestion['validate'];
+  return {
+    ask: {
+      confirm: () => Promise.resolve(true),
+      input: (question) => {
+        captured = question.validate;
+        return Promise.resolve(answer);
+      },
+    },
+    validate: () => captured,
+  };
+}
+
+describe('stepCreateProject, and the id that is not the name', () => {
+  /**
+   * The first stranger walk, 31-Jul-2026: the suggested name is also a real
+   * project id owned by the maintainer, so pasting it aimed every later console
+   * link at somebody else's project. The console answered with missing IAM
+   * permissions and advice about Firebase, none of which names the real mistake.
+   */
+  it('refuses the suggested name pasted as an id, and says which is which', async () => {
+    const { ctx } = recordingContext();
+    const harness = askHarness('');
+    ctx.ask = harness.ask;
+
+    await stepCreateProject(ctx);
+    const verdict = await harness.validate()?.(SUGGESTED_PROJECT_NAME);
+
+    expect(typeof verdict).toBe('string');
+    expect(verdict).toMatch(/name/i);
+    expect(verdict).toMatch(/id/i);
+  });
+
+  it('still accepts the derived id that person actually has', async () => {
+    const { ctx } = recordingContext();
+    const harness = askHarness('');
+    ctx.ask = harness.ask;
+
+    await stepCreateProject(ctx);
+
+    expect(await harness.validate()?.(`${SUGGESTED_PROJECT_NAME}-473829`)).toBe(true);
+  });
+
+  it('tells the reader the id is not the name before asking for it', async () => {
+    const { ctx, text } = recordingContext();
+    ctx.ask = askHarness('').ask;
+
+    await stepCreateProject(ctx);
+
+    const output = text();
+    expect(output).toMatch(/is not the id/i);
+    expect(output).toMatch(/ID column/i);
+  });
+});
 
 describe('showOutro', () => {
   it('suggests deleting the downloaded client JSON, by its exact path', () => {

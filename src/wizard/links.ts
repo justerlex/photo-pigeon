@@ -86,3 +86,22 @@ export function containsGoogle(value: string): boolean {
 
 /** The name the wizard suggests: no "Google" in it, npm-safe, obvious in a consent screen. */
 export const SUGGESTED_PROJECT_NAME = 'photo-pigeon-uploads';
+
+/**
+ * True when somebody has pasted the suggested NAME where the ID belongs.
+ *
+ * Display names are not unique and ids are, globally. Google derives an id from
+ * the name and appends digits when the plain form is taken, which it is: this
+ * exact string is a live project belonging to the maintainer. So a person who
+ * types the suggestion into the id question does not get a harmless mismatch,
+ * they get every later console link pointed at a stranger's project, and a wall
+ * of missing IAM permissions that names a project they have never heard of and
+ * recommends a Firebase role that has nothing to do with anything.
+ *
+ * Found on the first stranger walk, 31-Jul-2026, which is the only place it
+ * could have been found: on the maintainer's own account the id resolves and
+ * everything works.
+ */
+export function isTheSuggestedName(value: string): boolean {
+  return value.trim().toLowerCase() === SUGGESTED_PROJECT_NAME;
+}
