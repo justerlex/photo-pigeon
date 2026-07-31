@@ -27,10 +27,23 @@
 # is backed up offline before the first release and not after. TRAY-DESIGN section
 # 5, and rows 1 to 3 of the M5 plan.
 #
-# NPM_TOKEN, for the second road, is a granular automation token: the account uses
-# passkey 2FA, so CI cannot log in as a human. Without it the npm job says so and
-# publishes nothing, which is the right behaviour for a launch whose npm half may
-# come a day later.
+# The second road needs no secret at all. It publishes over OIDC trusted
+# publishing: the runner asks GitHub for a short-lived identity, npm matches it
+# against a rule registered on the package naming this repository and this
+# workflow file, and the publish goes through as a verified workflow rather than
+# as a person. Nothing long-lived is stored, so there is nothing to rotate, leak
+# or expire, and provenance is signed through the same identity.
+#
+# It was a stored token until 2026-08-01, and the first real attempt died with
+# EOTP, a demand for a one-time password. That was not a misconfiguration: npm
+# revoked classic tokens in November 2025 and the classic Automation type was the
+# one that skipped the OTP check, so what remained collided with two-factor auth
+# on writes. A token here was always a stand-in for a person, and the account
+# insists on the person. This removes the stand-in rather than hardening it.
+#
+# Renaming this file breaks publishing until the rule on npm is renamed with it.
+# That is the trade for having no secret, and it is a good one, but it is a real
+# coupling between a filename and a registry setting and it belongs written down.
 #
 # The e2e rig in app/e2e is not here, on purpose: it is PowerShell that launches
 # real trays and waits on a tray icon, an HKCU Run value and a pair of eyes, and a
@@ -43,6 +56,16 @@ on:
     tags: ['v*']
   release:
     types: [published]
+  # The retry door for the npm half alone. A publish can fail for reasons that
+  # have nothing to do with the build, and on 2026-08-01 one did, so without this
+  # the only way to try again is to cut a version number nobody needed. It takes
+  # an existing tag, it never builds and it never touches a Release: the installer
+  # job below stays push-only on purpose.
+  workflow_dispatch:
+    inputs:
+      tag:
+        description: 'An existing tag to publish to npm, e.g. v0.1.1'
+        required: true
 
 permissions:
   contents: read
@@ -273,7 +296,9 @@ jobs:
 
   npm:
     name: npm publish, on the click and not on the tag
-    if: github.event_name == 'release' && !github.event.release.prerelease
+    if: >-
+      (github.event_name == 'release' && !github.event.release.prerelease)
+      || github.event_name == 'workflow_dispatch'
     runs-on: ubuntu-latest
     timeout-minutes: 20
     permissions:
@@ -283,24 +308,28 @@ jobs:
       # repository: while github.com/justerlex/photo-pigeon is private, this flag
       # fails the publish. The repository has to be public for the SignPath
       # Foundation application anyway, so the order is public first, then publish.
+      # Trusted publishing: npm accepts the publish because this workflow, in this
+      # repository, asked for a short-lived identity and npm matched it against a
+      # rule registered on the package. There is no token here, and that is the
+      # point rather than a saving. Provenance is signed through the same identity.
       id-token: write
-
-    env:
-      # secrets cannot be read in a job level `if`, so the gate is an env var and
-      # a step level one. Without a token this job explains itself and exits 0:
-      # the npm half of a launch is allowed to arrive a day late.
-      HAS_NPM_TOKEN: ${{ secrets.NPM_TOKEN != '' }}
 
     steps:
       - uses: actions/checkout@v4
         with:
-          ref: ${{ github.event.release.tag_name }}
+          ref: ${{ github.event.release.tag_name || inputs.tag }}
 
       - uses: actions/setup-node@v4
         with:
           node-version: ${{ env.PIGEON_NODE }}
           registry-url: https://registry.npmjs.org
           cache: npm
+
+      # The Node pin ships npm 10, and OIDC publishing landed in the npm CLI at
+      # 11.5.1. Only the CLI moves: the pinned Node is what build-sidecar.mjs
+      # stages, and nothing here stages anything.
+      - name: npm new enough to publish over OIDC
+        run: npm install -g npm@latest
 
       - name: install the core's dependencies
         run: npm ci
@@ -309,20 +338,10 @@ jobs:
       # suites are not re-run here: this is the same commit the tag road already
       # proved on Windows, and the core suite has never been claimed on Linux.
       - name: version lockstep, the tag included
-        run: node scripts/check-versions.mjs --tag "${{ github.event.release.tag_name }}"
+        run: node scripts/check-versions.mjs --tag "${{ github.event.release.tag_name || inputs.tag }}"
 
       # prepublishOnly runs clean and tsc, so this publishes a freshly built dist
       # and not whatever was lying around. files is dist, README.md and LICENSE,
       # so nothing in app/ can reach the tarball.
       - name: publish
-        if: env.HAS_NPM_TOKEN == 'true'
         run: npm publish --provenance
-        env:
-          NODE_AUTH_TOKEN: ${{ secrets.NPM_TOKEN }}
-
-      - name: say plainly that nothing was published
-        if: env.HAS_NPM_TOKEN != 'true'
-        run: |
-          echo "NPM_TOKEN is not set, so nothing was published to npm."
-          echo "The account uses passkey 2FA, so this needs a granular automation token, which only the maintainer can mint."
-          echo "The GitHub release is unaffected."

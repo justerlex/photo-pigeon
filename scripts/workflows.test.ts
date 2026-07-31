@@ -350,11 +350,40 @@ describe('release.yml', () => {
     expect(npmJob.if ?? '').toContain('release');
   });
 
-  it('publishes to npm with provenance, and does nothing at all without a token', () => {
+  /**
+   * The npm half ran on a stored token until 2026-08-01, when the first real
+   * attempt died with EOTP. npm revoked classic tokens in November 2025, and the
+   * classic Automation type was the one that skipped the one-time password. What
+   * is left collides with 2FA on writes, so the token was never going to work
+   * here: it stood in for a person, and a person is exactly what the account
+   * insists on. Trusted publishing removes the stand-in instead of hardening it.
+   */
+  it('publishes over OIDC, with no token anywhere to leak or expire', () => {
     const publish = (npmJob.steps ?? []).find((step) => (step.run ?? '').includes('npm publish'));
 
     expect(publish?.run).toContain('--provenance');
-    expect(publish?.if ?? '').toMatch(/HAS_NPM_TOKEN/);
-    expect(npmJob.env?.HAS_NPM_TOKEN).toContain('secrets.NPM_TOKEN');
+    expect(npmJob.permissions?.['id-token']).toBe('write');
+    expect(text).not.toContain('NPM_TOKEN');
+    expect(text).not.toContain('NODE_AUTH_TOKEN');
+  });
+
+  it('upgrades npm first, because trusted publishing needs 11.5.1 and the pin ships 10', () => {
+    const upgrade = stepIndex(npmJob, 'npm install -g npm@');
+    const publish = stepIndex(npmJob, 'npm publish');
+
+    expect(upgrade).toBeGreaterThanOrEqual(0);
+    expect(upgrade).toBeLessThan(publish);
+  });
+
+  /**
+   * A publish can fail for reasons that have nothing to do with the build, as
+   * the EOTP one did. Without this the only retry is a new version number, so
+   * the npm half gets a door that needs an existing tag and never builds or
+   * releases anything.
+   */
+  it('can retry the npm half on an existing tag without cutting a version', () => {
+    expect(doc.on).toHaveProperty('workflow_dispatch');
+    expect(npmJob.if ?? '').toContain('workflow_dispatch');
+    expect(installer.if ?? '').toContain("github.event_name == 'push'");
   });
 });
