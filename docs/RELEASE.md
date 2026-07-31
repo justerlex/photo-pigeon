@@ -58,7 +58,9 @@ because getting them backwards is expensive:
   for every user at once.
 - **Nothing publishes before the walk.** Step 6 before step 7. The exit criterion
   is about a stranger, and the only way to test a stranger's path is to walk it as
-  one.
+  one. **Waived for v0.1.0 by the maintainer, 2026-07-31:** the sandbox matrix ran
+  green (122/0), and the walk runs as a post-publish verification against the
+  public Release, on the understanding that anything it finds ships as v0.1.1.
 
 ---
 
@@ -435,7 +437,10 @@ Two mechanical facts that decide whether the walk proves anything:
   item 4.4 closes the loop: the file attached to the published Release is the same
   file, by byte size, and not merely one with the same name.
 
-**Nothing in step 7 happens until section 1 of the checklist is ticked.**
+**Nothing in step 7 happens until section 1 of the checklist is ticked**, unless
+the maintainer waives the order in writing. **For v0.1.0 that waiver was given on
+2026-07-31**: section 1 runs against the public Release instead, and what it
+finds ships as v0.1.1.
 
 ## 7. Public, published, packaged, applied · maintainer
 

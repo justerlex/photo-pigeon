@@ -47,7 +47,8 @@ hands:
 - **No Google account.** The wizard cannot finish in here, so no photo is
   delivered, no token is written, and the first-delivery toast cannot be seen.
   That is section 1 of the M5 pass in `../CHECKLIST.md`, and nothing publishes
-  before it is walked.
+  before it is walked. For v0.1.0 the maintainer waived that order on 2026-07-31,
+  recorded in `docs/RELEASE.md`: the walk runs against the public Release.
 - **No mark of the web.** The installer arrives through a mapped folder, which
   carries no `Zone.Identifier`, so **SmartScreen has nothing to warn about and
   the wall never appears**. The real wall shows only on a machine that

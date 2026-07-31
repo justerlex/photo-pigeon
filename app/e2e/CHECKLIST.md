@@ -614,7 +614,9 @@ The house style these check against is written down once, in `CONTRIBUTING.md`.
 
 **M5 is the first pass whose work is mostly not code:** an installer met three
 different ways, a wall a stranger has to get past, and a walk nothing publishes
-without. The rest of M5 is rows 1 to 19 of the working plan in section 6 of
+without. For v0.1.0 the publish went first, by the dated maintainer waiver
+recorded in `docs/RELEASE.md`: section 1 runs against the public Release, and
+item 1.1 needs no GitHub login. The rest of M5 is rows 1 to 19 of the working plan in section 6 of
 `docs/TRAY-DESIGN.md`, which say whose hands each row needs. This list is row 20.
 
 There is one script at the top of it, and it deliberately runs somewhere else.
