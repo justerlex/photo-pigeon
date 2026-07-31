@@ -184,6 +184,37 @@ The design is written down at length in `docs/TRAY-DESIGN.md`, `PROBE.md` holds
 what was measured against Google's API, and `app/e2e/CHECKLIST.md` holds the
 passes a machine cannot walk.
 
+## Code signing policy
+
+Releases of this project are currently **unsigned**, and the Install section
+above says what Windows shows because of it. An application to SignPath
+Foundation went in with the first release.
+
+If and when it is granted, free code signing is provided by
+[SignPath.io](https://signpath.io), with the certificate issued by the
+[SignPath Foundation](https://signpath.org). The publisher line a user reads on a
+signed build will say **SignPath Foundation**, because that is whose certificate
+it is, rather than any name belonging to this project.
+
+**Team roles.** This is a single-maintainer project, and all three roles are held
+by the same person, which is stated plainly rather than dressed up:
+
+| Role | Who | What it means here |
+|---|---|---|
+| Authors | [@justerlex](https://github.com/justerlex) (Alexander Yermakov) | trusted to modify the source |
+| Reviewers | [@justerlex](https://github.com/justerlex) | approves pull requests before they merge |
+| Approvers | [@justerlex](https://github.com/justerlex) | authorises a release to be signed |
+
+Every release is approved for signing by hand. Nothing in this repository signs
+itself, and no automation holds that authority.
+
+**Privacy policy:** [PRIVACY.md](PRIVACY.md). The short version is that your
+photos go to your own Google Photos library and nowhere else, nothing is
+transferred before you finish the setup wizard, and there is no telemetry of any
+kind.
+
+**Code of conduct:** [CODE_OF_CONDUCT.md](CODE_OF_CONDUCT.md).
+
 ## License
 
 MIT, Alexander Yermakov (justerlex). See [LICENSE](LICENSE).
