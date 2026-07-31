@@ -1069,6 +1069,8 @@ Read **maintainer** as: it needs an identity, an account only the maintainer can
 
 **Row 20 is the pre-publish must.** A machine with no config, a person who never opens a terminal, and a first delivery. **Nothing publishes before it is walked**, because the exit criterion is about a stranger and the only way to test a stranger's path is to walk it as one. The one thing that cannot be borrowed: a machine that already holds an install, a Run value, a real ledger and a file Windows has already watched somebody run is not the fresh one and cannot be made into one.
 
+**For v0.1.0 the maintainer waived that order on 2026-07-31**, with the sandbox matrix green at 122/0 behind it, and the walk moved to the far side of the publish: section 1 of the M5 pass runs against the public Release, and what it finds ships as v0.1.1. The rule is not softened for the next version, and the waiver is dated so it cannot be read as one.
+
 *Exit: a stranger can download an installer from a GitHub Release, get past SmartScreen because the page told them how, and back up a folder.*
 
 **What M5 built against that plan:**
